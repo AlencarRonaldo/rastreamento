@@ -1,0 +1,344 @@
+name: Deploy Mobile App
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'apps/mobile/**'
+      - 'package.json'
+      - 'VERSION.json'
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to deploy'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - android
+        - ios
+        - update-only
+      channel:
+        description: 'Update channel'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+        - production
+        - preview
+        - development
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  # OTA Update deployment
+  ota-update:
+    name: Deploy OTA Update
+    runs-on: ubuntu-latest
+    if: github.event.inputs.platform == 'update-only' || github.event.inputs.platform == 'all' || github.event.inputs.platform == null
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Expo CLI
+        run: npm install -g @expo/cli eas-cli
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          cd apps/mobile && npm ci
+
+      - name: Get version info
+        id: version
+        run: |
+          VERSION=$(node scripts/version.js current)
+          BUILD_NUMBER=$(node scripts/version.js build-number)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+
+      - name: Configure Expo
+        run: |
+          cd apps/mobile
+          npx expo login --username ${{ secrets.EXPO_USERNAME }} --password ${{ secrets.EXPO_PASSWORD }}
+
+      - name: Publish to Expo (Production)
+        if: github.ref == 'refs/heads/main' && (github.event.inputs.channel == 'production' || github.event.inputs.channel == '')
+        run: |
+          cd apps/mobile
+          EXPO_PUBLIC_VERSION=${{ steps.version.outputs.version }} \
+          EXPO_PUBLIC_BUILD_NUMBER=${{ steps.version.outputs.build_number }} \
+          EXPO_PUBLIC_BUILD_TIME=${{ github.event.head_commit.timestamp }} \
+          eas update --channel production --message "Production update v${{ steps.version.outputs.version }}"
+
+      - name: Publish to Expo (Preview)
+        if: github.event.inputs.channel == 'preview'
+        run: |
+          cd apps/mobile
+          EXPO_PUBLIC_VERSION=${{ steps.version.outputs.version }} \
+          EXPO_PUBLIC_BUILD_NUMBER=${{ steps.version.outputs.build_number }} \
+          EXPO_PUBLIC_BUILD_TIME=${{ github.event.head_commit.timestamp }} \
+          eas update --channel preview --message "Preview update v${{ steps.version.outputs.version }}"
+
+      - name: Notify OTA deployment
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '📱 **Mobile OTA Update Deployed**\n\n' +
+                    '🚀 **Version**: ${{ steps.version.outputs.version }}\n' +
+                    '🏗️ **Build**: ${{ steps.version.outputs.build_number }}\n' +
+                    '📻 **Channel**: ${{ github.event.inputs.channel || "production" }}\n' +
+                    '📝 **Commit**: ${{ github.sha }}\n\n' +
+                    'Users will receive this update automatically on app launch.'
+            });
+
+  # Android build and deployment
+  build-android:
+    name: Build Android
+    runs-on: ubuntu-latest
+    if: github.event.inputs.platform == 'android' || github.event.inputs.platform == 'all'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Expo CLI
+        run: npm install -g @expo/cli eas-cli
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          cd apps/mobile && npm ci
+
+      - name: Get version info
+        id: version
+        run: |
+          VERSION=$(node scripts/version.js current)
+          BUILD_NUMBER=$(node scripts/version.js build-number)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+
+      - name: Configure Expo
+        run: |
+          cd apps/mobile
+          npx expo login --username ${{ secrets.EXPO_USERNAME }} --password ${{ secrets.EXPO_PASSWORD }}
+
+      - name: Build Android APK/AAB
+        run: |
+          cd apps/mobile
+          EXPO_PUBLIC_VERSION=${{ steps.version.outputs.version }} \
+          EXPO_PUBLIC_BUILD_NUMBER=${{ steps.version.outputs.build_number }} \
+          eas build --platform android --profile production --non-interactive
+
+      - name: Download build artifact
+        run: |
+          cd apps/mobile
+          eas build:list --platform android --json --non-interactive --limit 1 > build.json
+          BUILD_URL=$(cat build.json | jq -r '.[0].artifacts.buildUrl')
+          wget -O android-build.aab "$BUILD_URL"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: android-build-${{ steps.version.outputs.version }}
+          path: apps/mobile/android-build.aab
+          retention-days: 30
+
+  # iOS build and deployment
+  build-ios:
+    name: Build iOS
+    runs-on: macos-latest
+    if: github.event.inputs.platform == 'ios' || github.event.inputs.platform == 'all'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Expo CLI
+        run: npm install -g @expo/cli eas-cli
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          cd apps/mobile && npm ci
+
+      - name: Get version info
+        id: version
+        run: |
+          VERSION=$(node scripts/version.js current)
+          BUILD_NUMBER=$(node scripts/version.js build-number)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+
+      - name: Configure Expo
+        run: |
+          cd apps/mobile
+          npx expo login --username ${{ secrets.EXPO_USERNAME }} --password ${{ secrets.EXPO_PASSWORD }}
+
+      - name: Build iOS IPA
+        run: |
+          cd apps/mobile
+          EXPO_PUBLIC_VERSION=${{ steps.version.outputs.version }} \
+          EXPO_PUBLIC_BUILD_NUMBER=${{ steps.version.outputs.build_number }} \
+          eas build --platform ios --profile production --non-interactive
+
+      - name: Download build artifact
+        run: |
+          cd apps/mobile
+          eas build:list --platform ios --json --non-interactive --limit 1 > build.json
+          BUILD_URL=$(cat build.json | jq -r '.[0].artifacts.buildUrl')
+          wget -O ios-build.ipa "$BUILD_URL"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ios-build-${{ steps.version.outputs.version }}
+          path: apps/mobile/ios-build.ipa
+          retention-days: 30
+
+  # Deployment to stores
+  deploy-stores:
+    name: Deploy to Stores
+    needs: [build-android, build-ios]
+    runs-on: ubuntu-latest
+    if: always() && (needs.build-android.result == 'success' || needs.build-ios.result == 'success')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Expo CLI
+        run: npm install -g @expo/cli eas-cli
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          cd apps/mobile && npm ci
+
+      - name: Configure Expo
+        run: |
+          cd apps/mobile
+          npx expo login --username ${{ secrets.EXPO_USERNAME }} --password ${{ secrets.EXPO_PASSWORD }}
+
+      - name: Submit to Google Play Store
+        if: needs.build-android.result == 'success'
+        run: |
+          cd apps/mobile
+          eas submit --platform android --latest --track internal
+
+      - name: Submit to Apple App Store
+        if: needs.build-ios.result == 'success'
+        run: |
+          cd apps/mobile
+          eas submit --platform ios --latest
+
+      - name: Notify store submission
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const androidSuccess = '${{ needs.build-android.result }}' === 'success';
+            const iosSuccess = '${{ needs.build-ios.result }}' === 'success';
+            
+            let platforms = [];
+            if (androidSuccess) platforms.push('🤖 Google Play Store');
+            if (iosSuccess) platforms.push('🍎 Apple App Store');
+            
+            if (platforms.length > 0) {
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: '🚀 **Mobile App Submitted to Stores**\n\n' +
+                      '📱 **Platforms**: ' + platforms.join(', ') + '\n' +
+                      '🏗️ **Version**: ${{ needs.build-android.outputs.version || needs.build-ios.outputs.version }}\n' +
+                      '📝 **Commit**: ${{ github.sha }}\n\n' +
+                      '⏳ Apps are now under review and will be available soon.'
+              });
+            }
+
+  # Rollback capability for OTA updates
+  rollback-ota:
+    name: Rollback OTA
+    runs-on: ubuntu-latest
+    if: failure() && (github.event.inputs.platform == 'update-only' || github.event.inputs.platform == 'all')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Expo CLI
+        run: npm install -g @expo/cli eas-cli
+
+      - name: Configure Expo
+        run: |
+          cd apps/mobile
+          npx expo login --username ${{ secrets.EXPO_USERNAME }} --password ${{ secrets.EXPO_PASSWORD }}
+
+      - name: Get previous update
+        id: previous
+        run: |
+          cd apps/mobile
+          PREVIOUS_UPDATE=$(eas update:list --channel production --json --non-interactive --limit 2 | jq -r '.[1].id')
+          echo "update_id=$PREVIOUS_UPDATE" >> $GITHUB_OUTPUT
+
+      - name: Rollback to previous update
+        if: steps.previous.outputs.update_id != 'null'
+        run: |
+          cd apps/mobile
+          eas channel:rollback production --update ${{ steps.previous.outputs.update_id }}
+
+      - name: Notify rollback
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '🔄 **Mobile OTA Rollback**\n\n' +
+                    '❌ Current update failed deployment checks\n' +
+                    '⏪ Rolled back to previous stable update\n' +
+                    '📝 **Failed Commit**: ${{ github.sha }}\n\n' +
+                    'Users will receive the stable version on next app launch.'
+            });

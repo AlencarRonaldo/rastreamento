@@ -12,7 +12,9 @@
       "backgroundColor": "#2563eb"
     },
     "updates": {
-      "fallbackToCacheTimeout": 0,
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 5000,
       "url": "https://u.expo.dev/your-project-id"
     },
     "assetBundlePatterns": [

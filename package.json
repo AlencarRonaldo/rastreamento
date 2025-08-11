@@ -13,7 +13,18 @@
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "db:migrate": "cd apps/backend && npx prisma migrate dev",
-    "db:seed": "cd apps/backend && npx prisma db seed"
+    "db:seed": "cd apps/backend && npx prisma db seed",
+    "update:check": "node scripts/update-manager.js check",
+    "update:install": "node scripts/update-manager.js install",
+    "update:rollback": "node scripts/update-manager.js rollback",
+    "update:backup": "node scripts/update-manager.js backup",
+    "update:info": "node scripts/update-manager.js info",
+    "version:bump": "node scripts/version.js bump",
+    "version:current": "node scripts/version.js current",
+    "version:notes": "node scripts/version.js notes",
+    "version:validate": "node scripts/version.js validate",
+    "release:prepare": "npm run version:validate && npm run update:backup",
+    "release:semantic": "npx semantic-release"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
@@ -21,7 +32,14 @@
     "@typescript-eslint/parser": "^6.0.0",
     "eslint": "^8.0.0",
     "prettier": "^3.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^9.2.6",
+    "@semantic-release/npm": "^11.0.2",
+    "@semantic-release/exec": "^6.0.3",
+    "conventional-changelog-conventionalcommits": "^7.0.2",
+    "semantic-release": "^22.0.12"
   },
   "engines": {
     "node": ">=18.0.0",

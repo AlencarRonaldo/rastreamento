@@ -1,0 +1,291 @@
+name: Release Management
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'VERSION.json'
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Type of release'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+        - patch
+        - minor
+        - major
+      create_release:
+        description: 'Create GitHub release'
+        required: true
+        default: true
+        type: boolean
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  validate-version:
+    name: Validate Version
+    runs-on: ubuntu-latest
+
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is_new_version: ${{ steps.check.outputs.is_new }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Get current version
+        id: version
+        run: |
+          VERSION=$(node scripts/version.js current)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $VERSION"
+
+      - name: Check if version is new
+        id: check
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if git tag | grep -q "v$VERSION"; then
+            echo "is_new=false" >> $GITHUB_OUTPUT
+            echo "Version v$VERSION already exists"
+          else
+            echo "is_new=true" >> $GITHUB_OUTPUT
+            echo "New version v$VERSION detected"
+          fi
+
+      - name: Validate version format
+        run: node scripts/version.js validate
+
+  create-release:
+    name: Create Release
+    needs: validate-version
+    runs-on: ubuntu-latest
+    if: needs.validate-version.outputs.is_new_version == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          NOTES=$(node scripts/version.js notes $VERSION)
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Git tag
+        run: |
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          if ! git tag | grep -q "v$VERSION"; then
+            git tag -a "v$VERSION" -m "Release v$VERSION"
+            git push origin "v$VERSION"
+          fi
+
+      - name: Create GitHub Release
+        if: github.event.inputs.create_release != 'false'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ needs.validate-version.outputs.version }}
+          release_name: Release v${{ needs.validate-version.outputs.version }}
+          body: ${{ steps.notes.outputs.notes }}
+          draft: false
+          prerelease: false
+
+      - name: Update deployment channels
+        run: |
+          echo "Updating deployment channels for version ${{ needs.validate-version.outputs.version }}"
+          # Here you could update deployment channels or configurations
+
+  trigger-deployments:
+    name: Trigger Deployments
+    needs: [validate-version, create-release]
+    runs-on: ubuntu-latest
+    if: needs.validate-version.outputs.is_new_version == 'true'
+
+    strategy:
+      matrix:
+        deployment:
+          - { name: 'Web', workflow: 'deploy-web.yml', inputs: '{"environment": "production"}' }
+          - { name: 'Mobile OTA', workflow: 'deploy-mobile.yml', inputs: '{"platform": "update-only", "channel": "production"}' }
+
+    steps:
+      - name: Trigger ${{ matrix.deployment.name }} deployment
+        uses: actions/github-script@v6
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: '${{ matrix.deployment.workflow }}',
+              ref: 'main',
+              inputs: JSON.parse('${{ matrix.deployment.inputs }}')
+            });
+            
+            console.log('Triggered ${{ matrix.deployment.name }} deployment');
+
+  notify-teams:
+    name: Notify Teams
+    needs: [validate-version, create-release, trigger-deployments]
+    runs-on: ubuntu-latest
+    if: always() && needs.validate-version.outputs.is_new_version == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Get release information
+        id: release_info
+        run: |
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          CHANGELOG=$(node scripts/version.js notes $VERSION | head -n 20)
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Notify Slack
+        if: secrets.SLACK_WEBHOOK_URL
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#releases'
+          text: |
+            🚀 **New Release Deployed: v${{ needs.validate-version.outputs.version }}**
+            
+            📝 **Release Notes:**
+            ```
+            ${{ steps.release_info.outputs.changelog }}
+            ```
+            
+            🔗 **GitHub Release**: https://github.com/${{ github.repository }}/releases/tag/v${{ needs.validate-version.outputs.version }}
+            📱 **Mobile**: OTA update deployed to production channel
+            🌐 **Web**: Deployed to production environment
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify Discord
+        if: secrets.DISCORD_WEBHOOK_URL
+        uses: Ilshidur/action-discord@master
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        with:
+          args: |
+            🚀 **Vehicle Tracker v${{ needs.validate-version.outputs.version }}** has been released!
+            
+            📱 Mobile users will receive the update automatically
+            🌐 Web users can refresh their browsers
+            
+            🔗 **Release Notes**: https://github.com/${{ github.repository }}/releases/tag/v${{ needs.validate-version.outputs.version }}
+
+      - name: Create deployment summary
+        run: |
+          cat << EOF > deployment-summary.md
+          # Deployment Summary - v${{ needs.validate-version.outputs.version }}
+          
+          ## Release Information
+          - **Version**: ${{ needs.validate-version.outputs.version }}
+          - **Release Date**: $(date)
+          - **Commit**: ${{ github.sha }}
+          
+          ## Deployments Triggered
+          - ✅ Web Application (Production)
+          - ✅ Mobile OTA Update (Production Channel)
+          
+          ## Monitoring
+          - Web: Check Vercel dashboard for deployment status
+          - Mobile: Monitor Expo dashboard for update adoption
+          
+          ## Rollback Instructions
+          If issues arise, use the following commands:
+          \`\`\`bash
+          # Web rollback (via Vercel)
+          vercel promote <previous-deployment-url>
+          
+          # Mobile OTA rollback
+          cd apps/mobile
+          eas channel:rollback production --update <previous-update-id>
+          \`\`\`
+          EOF
+
+      - name: Upload deployment summary
+        uses: actions/upload-artifact@v3
+        with:
+          name: deployment-summary-v${{ needs.validate-version.outputs.version }}
+          path: deployment-summary.md
+          retention-days: 90
+
+  # Manual release workflow
+  manual-release:
+    name: Manual Release
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Bump version
+        id: bump
+        run: |
+          RELEASE_TYPE="${{ github.event.inputs.release_type }}"
+          NEW_VERSION=$(node scripts/version.js bump $RELEASE_TYPE)
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Bumped version to: $NEW_VERSION"
+
+      - name: Commit version changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          git add .
+          git commit -m "chore: bump version to ${{ steps.bump.outputs.new_version }}"
+          git push
+
+      - name: Create and push tag
+        run: |
+          NEW_VERSION="${{ steps.bump.outputs.new_version }}"
+          git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
+          git push origin "v$NEW_VERSION"
+
+      - name: Trigger release workflow
+        uses: actions/github-script@v6
+        with:
+          script: |
+            // The push to main will trigger the main release workflow
+            console.log('Version bump committed and pushed. Release workflow will be triggered automatically.');

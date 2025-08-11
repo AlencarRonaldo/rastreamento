@@ -1,0 +1,288 @@
+name: Semantic Release
+
+on:
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  release:
+    name: Semantic Release
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    outputs:
+      new_release_published: ${{ steps.semantic.outputs.new_release_published }}
+      new_release_version: ${{ steps.semantic.outputs.new_release_version }}
+      new_release_notes: ${{ steps.semantic.outputs.new_release_notes }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install semantic-release dependencies
+        run: |
+          npm install -g semantic-release
+          npm install --save-dev @semantic-release/changelog
+          npm install --save-dev @semantic-release/git
+          npm install --save-dev @semantic-release/github
+          npm install --save-dev @semantic-release/npm
+          npm install --save-dev @semantic-release/exec
+          npm install --save-dev conventional-changelog-conventionalcommits
+
+      - name: Verify release configuration
+        run: |
+          echo "Verifying .releaserc.json configuration..."
+          node -e "console.log('Release config:', JSON.stringify(require('./.releaserc.json'), null, 2))"
+
+      - name: Run semantic-release
+        id: semantic
+        run: npx semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          SLACK_RELEASE_WEBHOOK: ${{ secrets.SLACK_RELEASE_WEBHOOK }}
+          DISCORD_RELEASE_WEBHOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
+          CUSTOM_RELEASE_WEBHOOK: ${{ secrets.CUSTOM_RELEASE_WEBHOOK }}
+
+      - name: Upload release artifacts
+        if: steps.semantic.outputs.new_release_published == 'true'
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-artifacts-v${{ steps.semantic.outputs.new_release_version }}
+          path: |
+            dist/
+            CHANGELOG.md
+            VERSION.json
+          retention-days: 90
+
+  trigger-deployments:
+    name: Trigger Deployments
+    needs: release
+    runs-on: ubuntu-latest
+    if: needs.release.outputs.new_release_published == 'true'
+
+    strategy:
+      matrix:
+        deployment:
+          - name: Web Production
+            workflow: deploy-web.yml
+            inputs: '{"environment": "production"}'
+          - name: Mobile OTA
+            workflow: deploy-mobile.yml
+            inputs: '{"platform": "update-only", "channel": "production"}'
+
+    steps:
+      - name: Trigger ${{ matrix.deployment.name }}
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: '${{ matrix.deployment.workflow }}',
+              ref: 'main',
+              inputs: JSON.parse('${{ matrix.deployment.inputs }}')
+            });
+            
+            console.log('Triggered ${{ matrix.deployment.name }} deployment for version ${{ needs.release.outputs.new_release_version }}');
+
+      - name: Wait for deployment start
+        run: sleep 10
+
+  notify-release:
+    name: Notify Release
+    needs: [release, trigger-deployments]
+    runs-on: ubuntu-latest
+    if: always() && needs.release.outputs.new_release_published == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create release summary
+        run: |
+          cat << EOF > release-summary.md
+          # 🚀 Release Summary - v${{ needs.release.outputs.new_release_version }}
+          
+          ## Release Information
+          - **Version**: ${{ needs.release.outputs.new_release_version }}
+          - **Branch**: ${{ github.ref_name }}
+          - **Commit**: ${{ github.sha }}
+          - **Release Date**: $(date)
+          - **Triggered by**: ${{ github.actor }}
+          
+          ## Release Notes
+          ${{ needs.release.outputs.new_release_notes }}
+          
+          ## Automated Actions Triggered
+          - ✅ Web deployment to production
+          - ✅ Mobile OTA update to production channel
+          - ✅ GitHub release created
+          - ✅ Team notifications sent
+          
+          ## Links
+          - 🔗 [GitHub Release](https://github.com/${{ github.repository }}/releases/tag/v${{ needs.release.outputs.new_release_version }})
+          - 📱 [Mobile Updates](https://expo.dev/accounts/your-account/projects/vehicle-tracker/updates)
+          - 🌐 [Web Deployment](https://your-domain.vercel.app)
+          
+          ## Monitoring
+          Please monitor the following for the next 24 hours:
+          - Application performance metrics
+          - Error rates and logs
+          - User adoption of mobile updates
+          - Web application health checks
+          
+          ## Rollback Instructions
+          If issues arise, follow these steps:
+          
+          ### Web Application
+          \`\`\`bash
+          vercel promote <previous-deployment-url>
+          \`\`\`
+          
+          ### Mobile OTA Update
+          \`\`\`bash
+          cd apps/mobile
+          eas channel:rollback production --update <previous-update-id>
+          \`\`\`
+          
+          ### Full Version Rollback
+          \`\`\`bash
+          node scripts/update-manager.js rollback
+          \`\`\`
+          EOF
+
+      - name: Comment on commits
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('release-summary.md', 'utf8');
+            
+            // Get recent commits for this push
+            const commits = await github.rest.repos.listCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              per_page: 10
+            });
+            
+            // Comment on the latest commit
+            if (commits.data.length > 0) {
+              await github.rest.repos.createCommitComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: commits.data[0].sha,
+                body: summary
+              });
+            }
+
+      - name: Create deployment issue
+        if: github.ref == 'refs/heads/main'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('release-summary.md', 'utf8');
+            
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚀 Deployment Tracking - v${{ needs.release.outputs.new_release_version }}`,
+              body: summary,
+              labels: ['release', 'deployment', 'tracking']
+            });
+
+      - name: Upload release summary
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-summary-v${{ needs.release.outputs.new_release_version }}
+          path: release-summary.md
+          retention-days: 365
+
+  # Post-release validation
+  validate-release:
+    name: Validate Release
+    needs: [release, trigger-deployments]
+    runs-on: ubuntu-latest
+    if: needs.release.outputs.new_release_published == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Validate version consistency
+        run: |
+          VERSION="${{ needs.release.outputs.new_release_version }}"
+          
+          echo "Validating version consistency for $VERSION..."
+          
+          # Check VERSION.json
+          VERSION_JSON=$(node -p "require('./VERSION.json').version")
+          if [ "$VERSION_JSON" != "$VERSION" ]; then
+            echo "❌ VERSION.json mismatch: $VERSION_JSON != $VERSION"
+            exit 1
+          fi
+          
+          # Check package.json files
+          ROOT_VERSION=$(node -p "require('./package.json').version")
+          WEB_VERSION=$(node -p "require('./apps/web/package.json').version")
+          MOBILE_VERSION=$(node -p "require('./apps/mobile/package.json').version")
+          
+          if [ "$ROOT_VERSION" != "$VERSION" ] || [ "$WEB_VERSION" != "$VERSION" ] || [ "$MOBILE_VERSION" != "$VERSION" ]; then
+            echo "❌ Package version mismatch detected"
+            echo "Root: $ROOT_VERSION, Web: $WEB_VERSION, Mobile: $MOBILE_VERSION, Expected: $VERSION"
+            exit 1
+          fi
+          
+          echo "✅ All versions are consistent with $VERSION"
+
+      - name: Validate GitHub release
+        run: |
+          VERSION="${{ needs.release.outputs.new_release_version }}"
+          
+          # Wait a bit for GitHub to process the release
+          sleep 30
+          
+          # Check if release exists
+          if ! gh release view "v$VERSION" &>/dev/null; then
+            echo "❌ GitHub release v$VERSION not found"
+            exit 1
+          fi
+          
+          echo "✅ GitHub release v$VERSION exists"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Final validation report
+        run: |
+          echo "🎉 Release validation completed successfully!"
+          echo "Version ${{ needs.release.outputs.new_release_version }} has been:"
+          echo "  ✅ Released on GitHub"
+          echo "  ✅ Version files updated consistently"
+          echo "  ✅ Deployments triggered"
+          echo "  ✅ Teams notified"
+          echo ""
+          echo "🔗 Release URL: https://github.com/${{ github.repository }}/releases/tag/v${{ needs.release.outputs.new_release_version }}"

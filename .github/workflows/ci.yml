@@ -1,0 +1,282 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '18'
+  JAVA_VERSION: '17'
+
+jobs:
+  # Job para detectar mudanças
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      mobile: ${{ steps.changes.outputs.mobile }}
+      web: ${{ steps.changes.outputs.web }}
+      backend: ${{ steps.changes.outputs.backend }}
+      shared: ${{ steps.changes.outputs.shared }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect changes
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            mobile:
+              - 'apps/mobile/**'
+              - 'package.json'
+              - 'VERSION.json'
+            web:
+              - 'apps/web/**'
+              - 'package.json'
+              - 'VERSION.json'
+            backend:
+              - 'apps/backend/**'
+              - 'VERSION.json'
+            shared:
+              - 'scripts/**'
+              - 'package.json'
+              - '.github/workflows/**'
+              - 'VERSION.json'
+
+  # Testes e build da aplicação Web
+  web-ci:
+    name: Web CI
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.web == 'true' || needs.changes.outputs.shared == 'true'
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          cd apps/web && npm ci
+
+      - name: Type check
+        run: cd apps/web && npm run type-check
+
+      - name: Lint
+        run: cd apps/web && npm run lint
+
+      - name: Build
+        run: cd apps/web && npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Upload build artifacts
+        if: matrix.node-version == '18.x'
+        uses: actions/upload-artifact@v3
+        with:
+          name: web-build
+          path: apps/web/.next
+          retention-days: 1
+
+  # Testes e build da aplicação Mobile
+  mobile-ci:
+    name: Mobile CI
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.mobile == 'true' || needs.changes.outputs.shared == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Expo CLI
+        run: npm install -g @expo/cli eas-cli
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          cd apps/mobile && npm ci
+
+      - name: Type check
+        run: cd apps/mobile && npm run type-check
+
+      - name: Run tests
+        run: cd apps/mobile && npm run test
+
+      - name: Check Expo configuration
+        run: cd apps/mobile && npx expo doctor
+
+  # Testes e build do Backend (Java)
+  backend-ci:
+    name: Backend CI
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.shared == 'true'
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: vehicle_tracker_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      - name: Run tests
+        run: |
+          cd apps/backend
+          ./mvnw test
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vehicle_tracker_test
+
+      - name: Build application
+        run: |
+          cd apps/backend
+          ./mvnw clean package -DskipTests
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: backend-jar
+          path: apps/backend/target/*.jar
+          retention-days: 1
+
+  # Análise de segurança
+  security:
+    name: Security Analysis
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.web == 'true' || needs.changes.outputs.mobile == 'true' || needs.changes.outputs.shared == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: npm audit --audit-level=moderate
+        continue-on-error: true
+
+      - name: Run npm audit for web
+        run: cd apps/web && npm audit --audit-level=moderate
+        continue-on-error: true
+
+      - name: Run npm audit for mobile
+        run: cd apps/mobile && npm audit --audit-level=moderate
+        continue-on-error: true
+
+      - name: Initialize CodeQL
+        if: needs.changes.outputs.web == 'true' || needs.changes.outputs.mobile == 'true'
+        uses: github/codeql-action/init@v2
+        with:
+          languages: javascript
+
+      - name: Perform CodeQL Analysis
+        if: needs.changes.outputs.web == 'true' || needs.changes.outputs.mobile == 'true'
+        uses: github/codeql-action/analyze@v2
+
+  # Validação de versionamento
+  version-check:
+    name: Version Check
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.shared == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Validate version format
+        run: node scripts/version.js validate
+
+      - name: Check version consistency
+        run: |
+          ROOT_VERSION=$(node -p "require('./package.json').version")
+          WEB_VERSION=$(node -p "require('./apps/web/package.json').version")
+          MOBILE_VERSION=$(node -p "require('./apps/mobile/package.json').version")
+          
+          echo "Root version: $ROOT_VERSION"
+          echo "Web version: $WEB_VERSION"
+          echo "Mobile version: $MOBILE_VERSION"
+          
+          if [ "$ROOT_VERSION" != "$WEB_VERSION" ] || [ "$ROOT_VERSION" != "$MOBILE_VERSION" ]; then
+            echo "❌ Version mismatch detected!"
+            exit 1
+          fi
+          
+          echo "✅ All versions are consistent"
+
+  # Job final que depende de todos os outros
+  ci-success:
+    name: CI Success
+    runs-on: ubuntu-latest
+    needs: [web-ci, mobile-ci, backend-ci, security, version-check]
+    if: always()
+
+    steps:
+      - name: Check CI status
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "❌ One or more CI jobs failed"
+          exit 1
+
+      - name: CI Success
+        run: echo "✅ All CI jobs completed successfully"

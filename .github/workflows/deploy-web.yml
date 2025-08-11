@@ -1,0 +1,219 @@
+name: Deploy Web App
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'apps/web/**'
+      - 'package.json'
+      - 'VERSION.json'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+        - production
+        - staging
+        - preview
+
+env:
+  NODE_VERSION: '18'
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+  deploy:
+    name: Deploy to Vercel
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          cd apps/web && npm ci
+
+      - name: Get version info
+        id: version
+        run: |
+          VERSION=$(node scripts/version.js current)
+          BUILD_NUMBER=$(node scripts/version.js build-number)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "deployment_url=rastreamento-${{ github.event.inputs.environment || 'production' }}-$(echo $VERSION | tr '.' '-')-$BUILD_NUMBER.vercel.app" >> $GITHUB_OUTPUT
+
+      - name: Build application
+        run: cd apps/web && npm run build
+        env:
+          NODE_ENV: production
+          NEXT_PUBLIC_VERSION: ${{ steps.version.outputs.version }}
+          NEXT_PUBLIC_BUILD_NUMBER: ${{ steps.version.outputs.build_number }}
+          NEXT_PUBLIC_BUILD_TIME: ${{ github.event.head_commit.timestamp }}
+          NEXT_PUBLIC_COMMIT_SHA: ${{ github.sha }}
+
+      - name: Deploy to Vercel (Production)
+        if: github.ref == 'refs/heads/main' && (github.event.inputs.environment == 'production' || github.event.inputs.environment == '')
+        run: |
+          cd apps/web
+          vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+          vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+          DEPLOYMENT_URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "DEPLOYMENT_URL=$DEPLOYMENT_URL" >> $GITHUB_ENV
+          echo "Deployed to: $DEPLOYMENT_URL"
+
+      - name: Deploy to Vercel (Staging)
+        if: github.event.inputs.environment == 'staging'
+        run: |
+          cd apps/web
+          vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+          vercel build --token=${{ secrets.VERCEL_TOKEN }}
+          DEPLOYMENT_URL=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
+          echo "DEPLOYMENT_URL=$DEPLOYMENT_URL" >> $GITHUB_ENV
+          echo "Deployed to: $DEPLOYMENT_URL"
+
+      - name: Deploy to Vercel (Preview)
+        if: github.event.inputs.environment == 'preview'
+        run: |
+          cd apps/web
+          vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+          vercel build --token=${{ secrets.VERCEL_TOKEN }}
+          DEPLOYMENT_URL=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
+          echo "DEPLOYMENT_URL=$DEPLOYMENT_URL" >> $GITHUB_ENV
+          echo "Deployed to: $DEPLOYMENT_URL"
+
+      - name: Update deployment status
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const deployment = await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.sha,
+              environment: '${{ github.event.inputs.environment || "production" }}',
+              description: 'Web app deployment v${{ steps.version.outputs.version }}',
+              auto_merge: false,
+              required_contexts: []
+            });
+
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: deployment.data.id,
+              state: 'success',
+              target_url: process.env.DEPLOYMENT_URL,
+              description: 'Deployment successful'
+            });
+
+      - name: Run post-deployment tests
+        run: |
+          echo "Running post-deployment tests..."
+          # Add your tests here
+          curl -f $DEPLOYMENT_URL || exit 1
+          echo "✅ Deployment health check passed"
+
+      - name: Notify deployment success
+        if: success()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ Web app successfully deployed!\n\n' +
+                    '🚀 **Version**: ${{ steps.version.outputs.version }}\n' +
+                    '🏗️ **Build**: ${{ steps.version.outputs.build_number }}\n' +
+                    '🌍 **Environment**: ${{ github.event.inputs.environment || "production" }}\n' +
+                    '🔗 **URL**: ' + process.env.DEPLOYMENT_URL + '\n' +
+                    '📝 **Commit**: ${{ github.sha }}'
+            });
+
+      - name: Update version tracking
+        run: |
+          echo "Updating deployment tracking..."
+          # Here you could update a database or monitoring service
+          # with deployment information
+
+  lighthouse:
+    name: Lighthouse CI
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: success()
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Lighthouse CI
+        run: npm install -g @lhci/cli@0.12.x
+
+      - name: Run Lighthouse CI
+        run: lhci autorun
+        env:
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+          LHCI_SERVER_URL: ${{ secrets.LHCI_SERVER_URL }}
+          LHCI_SERVER_TOKEN: ${{ secrets.LHCI_SERVER_TOKEN }}
+
+  rollback:
+    name: Rollback on Failure
+    needs: [deploy, lighthouse]
+    runs-on: ubuntu-latest
+    if: failure()
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Get previous deployment
+        id: previous
+        run: |
+          PREVIOUS_URL=$(vercel ls --token=${{ secrets.VERCEL_TOKEN }} | grep "vehicle-tracker" | sed -n '2p' | awk '{print $1}')
+          echo "previous_url=$PREVIOUS_URL" >> $GITHUB_OUTPUT
+
+      - name: Rollback to previous version
+        if: steps.previous.outputs.previous_url != ''
+        run: |
+          vercel promote ${{ steps.previous.outputs.previous_url }} --token=${{ secrets.VERCEL_TOKEN }}
+          echo "🔄 Rolled back to previous deployment: ${{ steps.previous.outputs.previous_url }}"
+
+      - name: Notify rollback
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '🔄 **Deployment Rollback**\n\n' +
+                    '❌ Current deployment failed quality checks\n' +
+                    '⏪ Rolled back to previous stable version\n' +
+                    '🔗 **Active URL**: ${{ steps.previous.outputs.previous_url }}\n' +
+                    '📝 **Failed Commit**: ${{ github.sha }}'
+            });
