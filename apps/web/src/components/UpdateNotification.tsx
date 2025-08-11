@@ -82,8 +82,11 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onDismiss }) =>
     if (status.error) return status.error;
     if (status.isDownloading) return `Progresso: ${status.progress || 0}%`;
     if (status.isRestarting) return 'Por favor, aguarde...';
-    if (updateInfo?.changelog.length) {
+    if (updateInfo?.changelog && updateInfo.changelog.length > 0) {
       return updateInfo.changelog.slice(0, 2).join(', ');
+    }
+    if (updateInfo?.features && updateInfo.features.length > 0) {
+      return updateInfo.features.slice(0, 2).join(', ');
     }
     return 'Clique para atualizar agora';
   };

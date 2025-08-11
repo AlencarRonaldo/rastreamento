@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PWA Icon Generator</title>
+</head>
+<body>
+    <h1>PWA Icon Generator</h1>
+    <p>Este arquivo gera os ícones PWA necessários. Abra no navegador e clique em "Gerar Ícones".</p>
+    
+    <button onclick="generateIcons()">Gerar Ícones</button>
+    <div id="status"></div>
+    <div id="icons"></div>
+
+    <script>
+    const iconSizes = [
+        { size: 16, name: 'icon-16x16.png' },
+        { size: 32, name: 'icon-32x32.png' },
+        { size: 72, name: 'icon-72x72.png' },
+        { size: 96, name: 'icon-96x96.png' },
+        { size: 128, name: 'icon-128x128.png' },
+        { size: 144, name: 'icon-144x144.png' },
+        { size: 152, name: 'icon-152x152.png' },
+        { size: 180, name: 'icon-180x180.png' },
+        { size: 192, name: 'icon-192x192.png' },
+        { size: 384, name: 'icon-384x384.png' },
+        { size: 512, name: 'icon-512x512.png' }
+    ];
+
+    function drawIcon(canvas, size) {
+        const ctx = canvas.getContext('2d');
+        const scale = size / 512;
+        
+        // Clear canvas
+        ctx.clearRect(0, 0, size, size);
+        
+        // Background circle
+        ctx.beginPath();
+        ctx.arc(size/2, size/2, size/2, 0, Math.PI * 2);
+        ctx.fillStyle = '#2563eb';
+        ctx.fill();
+        
+        // Save context for transformations
+        ctx.save();
+        ctx.translate(size/2, size/2);
+        ctx.scale(scale * 1.5, scale * 1.5);
+        
+        // Car body
+        ctx.beginPath();
+        ctx.roundRect(-64, -20, 128, 40, 20);
+        ctx.fillStyle = 'white';
+        ctx.fill();
+        
+        // Car windows
+        ctx.beginPath();
+        ctx.roundRect(-48, -35, 32, 15, 7);
+        ctx.fill();
+        
+        ctx.beginPath();
+        ctx.roundRect(-8, -35, 32, 15, 7);
+        ctx.fill();
+        
+        ctx.beginPath();
+        ctx.roundRect(16, -35, 32, 15, 7);
+        ctx.fill();
+        
+        // Wheels
+        ctx.beginPath();
+        ctx.arc(-40, 20, 12, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.beginPath();
+        ctx.arc(40, 20, 12, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Wheel details
+        ctx.beginPath();
+        ctx.arc(-40, 20, 6, 0, Math.PI * 2);
+        ctx.fillStyle = '#2563eb';
+        ctx.fill();
+        
+        ctx.beginPath();
+        ctx.arc(40, 20, 6, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // GPS signal lines
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 3;
+        ctx.globalAlpha = 0.7;
+        
+        ctx.beginPath();
+        ctx.moveTo(0, -80);
+        ctx.quadraticCurveTo(-20, -60, -40, -40);
+        ctx.stroke();
+        
+        ctx.globalAlpha = 0.9;
+        ctx.beginPath();
+        ctx.moveTo(0, -80);
+        ctx.lineTo(0, -40);
+        ctx.stroke();
+        
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath();
+        ctx.moveTo(0, -80);
+        ctx.quadraticCurveTo(20, -60, 40, -40);
+        ctx.stroke();
+        
+        // GPS dot
+        ctx.globalAlpha = 1;
+        ctx.beginPath();
+        ctx.arc(0, -80, 4, 0, Math.PI * 2);
+        ctx.fillStyle = 'white';
+        ctx.fill();
+        
+        ctx.restore();
+        
+        // Location pin (scaled and positioned)
+        ctx.save();
+        ctx.translate(size * 0.74, size * 0.26);
+        ctx.scale(scale * 0.8, scale * 0.8);
+        
+        // Pin shape
+        ctx.beginPath();
+        ctx.moveTo(24, 2);
+        ctx.bezierCurveTo(13.5, 2, 5, 10.5, 5, 21);
+        ctx.bezierCurveTo(5, 36.25, 24, 58, 24, 58);
+        ctx.bezierCurveTo(24, 58, 43, 36.25, 43, 21);
+        ctx.bezierCurveTo(43, 10.5, 34.5, 2, 24, 2);
+        ctx.closePath();
+        ctx.fillStyle = 'white';
+        ctx.fill();
+        
+        // Pin center
+        ctx.beginPath();
+        ctx.arc(24, 21, 7, 0, Math.PI * 2);
+        ctx.fillStyle = '#2563eb';
+        ctx.fill();
+        
+        ctx.restore();
+    }
+
+    function generateIcons() {
+        const statusDiv = document.getElementById('status');
+        const iconsDiv = document.getElementById('icons');
+        
+        statusDiv.innerHTML = '<p>Gerando ícones...</p>';
+        iconsDiv.innerHTML = '';
+        
+        iconSizes.forEach(({ size, name }) => {
+            // Create canvas
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            
+            // Draw icon
+            drawIcon(canvas, size);
+            
+            // Create download link
+            canvas.toBlob((blob) => {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = name;
+                link.textContent = `Download ${name} (${size}x${size})`;
+                link.style.display = 'block';
+                link.style.marginBottom = '10px';
+                
+                // Add preview
+                const img = document.createElement('img');
+                img.src = url;
+                img.width = 64;
+                img.height = 64;
+                img.style.marginRight = '10px';
+                img.style.verticalAlign = 'middle';
+                
+                const div = document.createElement('div');
+                div.appendChild(img);
+                div.appendChild(link);
+                iconsDiv.appendChild(div);
+            }, 'image/png');
+        });
+        
+        statusDiv.innerHTML = '<p>✅ Ícones gerados! Clique nos links abaixo para fazer download.</p>';
+    }
+
+    // Add roundRect polyfill for older browsers
+    if (!CanvasRenderingContext2D.prototype.roundRect) {
+        CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+            if (w < 2 * r) r = w / 2;
+            if (h < 2 * r) r = h / 2;
+            this.beginPath();
+            this.moveTo(x + r, y);
+            this.arcTo(x + w, y, x + w, y + h, r);
+            this.arcTo(x + w, y + h, x, y + h, r);
+            this.arcTo(x, y + h, x, y, r);
+            this.arcTo(x, y, x + w, y, r);
+            this.closePath();
+            return this;
+        };
+    }
+    </script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #1d4ed8;
+        }
+        #icons {
+            margin-top: 20px;
+        }
+        #icons div {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #e5e7eb;
+            border-radius: 5px;
+        }
+        #status {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f3f4f6;
+            border-radius: 5px;
+        }
+    </style>
+</body>
+</html>

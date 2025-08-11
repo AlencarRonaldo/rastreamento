@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { MapView } from '@/components/map/map-view';
+import { DynamicMapView as MapView } from '@/components/map/dynamic-map-view';
 import { StatsCard } from '@/components/dashboard/stats-card';
 import { AlertsList } from '@/components/dashboard/alerts-list';
 import { VehiclesList } from '@/components/dashboard/vehicles-list';

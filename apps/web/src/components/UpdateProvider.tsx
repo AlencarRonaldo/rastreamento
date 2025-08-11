@@ -20,11 +20,11 @@ interface UpdateProviderProps {
   checkInterval?: number;
 }
 
-export const UpdateProvider: React.FC<UpdateProviderProps> = ({ 
+export const UpdateProvider = ({ 
   children, 
   autoCheck = true,
   checkInterval = 30 * 60 * 1000 // 30 minutes
-}) => {
+}: UpdateProviderProps) => {
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [status, setStatus] = useState<UpdateStatus>({
     isChecking: false,
@@ -46,22 +46,42 @@ export const UpdateProvider: React.FC<UpdateProviderProps> = ({
     // Register for status changes
     const unsubscribeStatus = WebUpdateService.onStatusChange(setStatus);
 
+    // Listen for Service Worker update messages
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      if (event.data.type === 'FORCE_UPDATE_REQUEST') {
+        // Service Worker is requesting an update
+        setUpdateInfo({
+          version: event.data.data?.version || 'unknown',
+          releaseDate: new Date().toISOString(),
+          features: ['Atualização do Service Worker disponível'],
+          fixes: [],
+          size: 0,
+          mandatory: false,
+          downloadUrl: ''
+        });
+        setDismissed(false);
+      }
+    };
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+    }
+
     // Auto-check for updates if enabled
+    let interval: NodeJS.Timeout | undefined;
     if (autoCheck) {
-      const interval = setInterval(async () => {
+      interval = setInterval(async () => {
         await checkForUpdates();
       }, checkInterval);
-
-      return () => {
-        clearInterval(interval);
-        unsubscribeUpdate();
-        unsubscribeStatus();
-      };
     }
 
     return () => {
+      if (interval) clearInterval(interval);
       unsubscribeUpdate();
       unsubscribeStatus();
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+      }
     };
   }, [autoCheck, checkInterval]);
 

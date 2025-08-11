@@ -10,13 +10,7 @@ import { RoutePolyline } from './route-polyline';
 import { GeofenceOverlay } from './geofence-overlay';
 import { cn } from '@/lib/utils';
 
-// Fix for default markers in React Leaflet
-delete (Icon.Default.prototype as any)._getIconUrl;
-Icon.Default.mergeOptions({
-  iconRetinaUrl: '/leaflet/marker-icon-2x.png',
-  iconUrl: '/leaflet/marker-icon.png',
-  shadowUrl: '/leaflet/marker-shadow.png',
-});
+// Fix for default markers in React Leaflet - moved to component to avoid SSR issues
 
 interface MapViewProps {
   vehicles: Vehicle[];
@@ -112,9 +106,17 @@ export function MapView({
 }: MapViewProps) {
   const [isClient, setIsClient] = React.useState(false);
 
-  // Ensure this only renders on client side
+  // Ensure this only renders on client side and fix Leaflet icons
   React.useEffect(() => {
     setIsClient(true);
+    
+    // Fix for default markers in React Leaflet
+    delete (Icon.Default.prototype as any)._getIconUrl;
+    Icon.Default.mergeOptions({
+      iconRetinaUrl: '/leaflet/marker-icon-2x.png',
+      iconUrl: '/leaflet/marker-icon.png',
+      shadowUrl: '/leaflet/marker-shadow.png',
+    });
   }, []);
 
   const handleMapClick = React.useCallback((e: any) => {

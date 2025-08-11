@@ -2,11 +2,16 @@
 
 export interface UpdateInfo {
   version: string;
-  buildNumber: number;
+  buildNumber?: number;
   releaseDate: string;
-  isAvailable: boolean;
-  isForced: boolean;
-  changelog: string[];
+  isAvailable?: boolean;
+  isForced?: boolean;
+  changelog?: string[];
+  features?: string[];
+  fixes?: string[];
+  size?: number;
+  mandatory?: boolean;
+  downloadUrl?: string;
   downloadSize?: number;
 }
 
@@ -41,7 +46,8 @@ class WebUpdateService {
    * Inicializa o serviço de atualização
    */
   async initialize(): Promise<void> {
-    if ('serviceWorker' in navigator) {
+    // Desabilitar em desenvolvimento
+    if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
       try {
         // Registrar service worker
         const registration = await navigator.serviceWorker.register('/sw.js', {
@@ -64,6 +70,8 @@ class WebUpdateService {
       } catch (error) {
         console.error('❌ Service Worker registration failed:', error);
       }
+    } else if (process.env.NODE_ENV !== 'production') {
+      console.log('✅ WebUpdateService initialized (development mode)');
     } else {
       console.warn('Service Workers not supported');
     }
@@ -203,11 +211,16 @@ class WebUpdateService {
         const registration = await navigator.serviceWorker.getRegistration();
         
         if (registration) {
-          // Forçar verificação de atualização
-          await registration.update();
-          
-          // Aguardar um pouco para o service worker processar
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          try {
+            // Forçar verificação de atualização com tratamento de erro
+            await registration.update();
+            
+            // Aguardar um pouco para o service worker processar
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          } catch (updateError) {
+            console.warn('Service worker update failed:', updateError);
+            // Continuar mesmo com falha na atualização
+          }
           
           // Verificar se há worker esperando
           if (registration.waiting) {
@@ -232,7 +245,7 @@ class WebUpdateService {
       return null;
     } catch (error) {
       console.error('Error checking for updates:', error);
-      this.setStatus({ isChecking: false, error: error.message });
+      this.setStatus({ isChecking: false, error: error instanceof Error ? error.message : 'Unknown error' });
       return null;
     }
   }
@@ -261,7 +274,7 @@ class WebUpdateService {
       console.error('Error applying update:', error);
       this.setStatus({ 
         isDownloading: false, 
-        error: 'Falha ao aplicar atualização: ' + error.message 
+        error: 'Falha ao aplicar atualização: ' + (error instanceof Error ? error.message : 'Unknown error')
       });
     }
   }

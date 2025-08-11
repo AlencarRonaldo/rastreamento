@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test PWA - Rastreador Veicular</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background: #d1fae5; color: #065f46; }
+        .error { background: #fee2e2; color: #991b1b; }
+        .warning { background: #fef3c7; color: #92400e; }
+        .info { background: #dbeafe; color: #1e40af; }
+        button {
+            background: #2563eb;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #1d4ed8; }
+        button:disabled { background: #9ca3af; cursor: not-allowed; }
+        pre { background: #f3f4f6; padding: 15px; border-radius: 4px; overflow-x: auto; }
+        .test-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Test PWA - Rastreador Veicular</h1>
+    <p>Esta página testa todas as funcionalidades PWA do sistema de rastreamento veicular.</p>
+
+    <div class="test-grid">
+        <!-- Service Worker Test -->
+        <div class="test-section">
+            <h2>🔧 Service Worker</h2>
+            <div id="sw-status" class="status info">Verificando...</div>
+            <button onclick="testServiceWorker()">Testar Service Worker</button>
+            <button onclick="updateServiceWorker()">Atualizar SW</button>
+            <div id="sw-details"></div>
+        </div>
+
+        <!-- Manifest Test -->
+        <div class="test-section">
+            <h2>📱 Manifest</h2>
+            <div id="manifest-status" class="status info">Verificando...</div>
+            <button onclick="testManifest()">Testar Manifest</button>
+            <div id="manifest-details"></div>
+        </div>
+
+        <!-- Installation Test -->
+        <div class="test-section">
+            <h2>💾 Instalação</h2>
+            <div id="install-status" class="status info">Verificando...</div>
+            <button onclick="testInstallability()" id="install-test-btn">Verificar Instalação</button>
+            <button onclick="triggerInstall()" id="install-btn" disabled>Instalar App</button>
+            <div id="install-details"></div>
+        </div>
+
+        <!-- Cache Test -->
+        <div class="test-section">
+            <h2>💾 Cache</h2>
+            <div id="cache-status" class="status info">Verificando...</div>
+            <button onclick="testCache()">Testar Cache</button>
+            <button onclick="clearCache()">Limpar Cache</button>
+            <div id="cache-details"></div>
+        </div>
+
+        <!-- Offline Test -->
+        <div class="test-section">
+            <h2>🔌 Offline</h2>
+            <div id="offline-status" class="status info">Online</div>
+            <button onclick="testOffline()">Simular Offline</button>
+            <div id="offline-details"></div>
+        </div>
+
+        <!-- Notifications Test -->
+        <div class="test-section">
+            <h2>🔔 Notificações</h2>
+            <div id="notification-status" class="status info">Verificando...</div>
+            <button onclick="testNotifications()">Testar Notificações</button>
+            <button onclick="sendTestNotification()" disabled id="send-notification-btn">Enviar Teste</button>
+            <div id="notification-details"></div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 Relatório Completo</h2>
+        <button onclick="runAllTests()">Executar Todos os Testes</button>
+        <div id="full-report"></div>
+    </div>
+
+    <script>
+        let deferredPrompt;
+        let swRegistration;
+
+        // Initialize tests on load
+        window.addEventListener('load', () => {
+            runAllTests();
+        });
+
+        // Listen for beforeinstallprompt
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            document.getElementById('install-btn').disabled = false;
+            updateStatus('install-status', 'success', 'App pode ser instalado!');
+        });
+
+        // Online/Offline detection
+        window.addEventListener('online', () => {
+            updateStatus('offline-status', 'success', 'Online');
+        });
+
+        window.addEventListener('offline', () => {
+            updateStatus('offline-status', 'warning', 'Offline');
+        });
+
+        function updateStatus(elementId, type, message) {
+            const element = document.getElementById(elementId);
+            element.className = `status ${type}`;
+            element.textContent = message;
+        }
+
+        function updateDetails(elementId, content) {
+            document.getElementById(elementId).innerHTML = content;
+        }
+
+        async function testServiceWorker() {
+            try {
+                if ('serviceWorker' in navigator) {
+                    const registration = await navigator.serviceWorker.register('/sw.js');
+                    swRegistration = registration;
+                    
+                    updateStatus('sw-status', 'success', 'Service Worker registrado com sucesso!');
+                    
+                    const details = `
+                        <pre>Scope: ${registration.scope}
+State: ${registration.active ? registration.active.state : 'Não ativo'}
+Update Found: ${registration.waiting ? 'Sim' : 'Não'}</pre>
+                    `;
+                    updateDetails('sw-details', details);
+                    
+                    // Listen for updates
+                    registration.addEventListener('updatefound', () => {
+                        updateStatus('sw-status', 'warning', 'Atualização disponível!');
+                    });
+                    
+                } else {
+                    updateStatus('sw-status', 'error', 'Service Workers não suportados');
+                }
+            } catch (error) {
+                updateStatus('sw-status', 'error', `Erro: ${error.message}`);
+            }
+        }
+
+        async function updateServiceWorker() {
+            if (swRegistration) {
+                try {
+                    await swRegistration.update();
+                    updateStatus('sw-status', 'info', 'Verificação de atualização solicitada...');
+                } catch (error) {
+                    updateStatus('sw-status', 'error', `Erro na atualização: ${error.message}`);
+                }
+            }
+        }
+
+        async function testManifest() {
+            try {
+                const response = await fetch('/manifest.json');
+                const manifest = await response.json();
+                
+                updateStatus('manifest-status', 'success', 'Manifest carregado com sucesso!');
+                
+                const details = `
+                    <pre>Nome: ${manifest.name}
+Nome Curto: ${manifest.short_name}
+Start URL: ${manifest.start_url}
+Display: ${manifest.display}
+Theme Color: ${manifest.theme_color}
+Ícones: ${manifest.icons.length} encontrados</pre>
+                `;
+                updateDetails('manifest-details', details);
+                
+            } catch (error) {
+                updateStatus('manifest-status', 'error', `Erro ao carregar manifest: ${error.message}`);
+            }
+        }
+
+        function testInstallability() {
+            const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+            
+            if (isStandalone) {
+                updateStatus('install-status', 'success', 'App já está instalado!');
+                updateDetails('install-details', '<p>O app está rodando em modo standalone.</p>');
+            } else if (deferredPrompt) {
+                updateStatus('install-status', 'success', 'App pode ser instalado!');
+                document.getElementById('install-btn').disabled = false;
+            } else {
+                updateStatus('install-status', 'warning', 'Critérios de instalação não atendidos ainda');
+                updateDetails('install-details', '<p>O navegador ainda não ofereceu a opção de instalação. Isso pode acontecer após algumas visitas ao site.</p>');
+            }
+        }
+
+        async function triggerInstall() {
+            if (deferredPrompt) {
+                try {
+                    await deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    
+                    if (outcome === 'accepted') {
+                        updateStatus('install-status', 'success', 'Instalação aceita!');
+                    } else {
+                        updateStatus('install-status', 'info', 'Instalação cancelada');
+                    }
+                    
+                    deferredPrompt = null;
+                    document.getElementById('install-btn').disabled = true;
+                    
+                } catch (error) {
+                    updateStatus('install-status', 'error', `Erro na instalação: ${error.message}`);
+                }
+            }
+        }
+
+        async function testCache() {
+            try {
+                const cacheNames = await caches.keys();
+                updateStatus('cache-status', 'success', `${cacheNames.length} caches encontrados`);
+                
+                let details = '<h4>Caches:</h4><ul>';
+                for (const name of cacheNames) {
+                    const cache = await caches.open(name);
+                    const keys = await cache.keys();
+                    details += `<li><strong>${name}</strong>: ${keys.length} itens</li>`;
+                }
+                details += '</ul>';
+                
+                updateDetails('cache-details', details);
+                
+            } catch (error) {
+                updateStatus('cache-status', 'error', `Erro no cache: ${error.message}`);
+            }
+        }
+
+        async function clearCache() {
+            try {
+                const cacheNames = await caches.keys();
+                await Promise.all(cacheNames.map(name => caches.delete(name)));
+                updateStatus('cache-status', 'success', 'Cache limpo com sucesso!');
+                updateDetails('cache-details', '<p>Todos os caches foram removidos.</p>');
+            } catch (error) {
+                updateStatus('cache-status', 'error', `Erro ao limpar cache: ${error.message}`);
+            }
+        }
+
+        function testOffline() {
+            updateStatus('offline-status', navigator.onLine ? 'success' : 'warning', 
+                        navigator.onLine ? 'Online' : 'Offline');
+            
+            const details = `
+                <p><strong>Navigator Online:</strong> ${navigator.onLine}</p>
+                <p><strong>Connection:</strong> ${navigator.connection ? navigator.connection.effectiveType : 'Não disponível'}</p>
+            `;
+            updateDetails('offline-details', details);
+        }
+
+        async function testNotifications() {
+            try {
+                if ('Notification' in window) {
+                    const permission = await Notification.requestPermission();
+                    
+                    if (permission === 'granted') {
+                        updateStatus('notification-status', 'success', 'Notificações permitidas');
+                        document.getElementById('send-notification-btn').disabled = false;
+                    } else {
+                        updateStatus('notification-status', 'warning', `Permissão: ${permission}`);
+                    }
+                    
+                    updateDetails('notification-details', `<p>Permissão atual: <strong>${permission}</strong></p>`);
+                    
+                } else {
+                    updateStatus('notification-status', 'error', 'Notificações não suportadas');
+                }
+            } catch (error) {
+                updateStatus('notification-status', 'error', `Erro: ${error.message}`);
+            }
+        }
+
+        function sendTestNotification() {
+            if (Notification.permission === 'granted') {
+                const notification = new Notification('Teste PWA', {
+                    body: 'Esta é uma notificação de teste do Rastreador Veicular!',
+                    icon: '/icons/icon-192x192.png',
+                    badge: '/icons/badge-72x72.png',
+                    tag: 'test-notification',
+                    requireInteraction: false
+                });
+                
+                notification.onclick = () => {
+                    window.focus();
+                    notification.close();
+                };
+                
+                updateStatus('notification-status', 'success', 'Notificação enviada!');
+            }
+        }
+
+        async function runAllTests() {
+            updateStatus('full-report', 'info', 'Executando todos os testes...');
+            
+            await testServiceWorker();
+            await testManifest();
+            testInstallability();
+            await testCache();
+            testOffline();
+            await testNotifications();
+            
+            // Generate summary
+            const tests = [
+                { name: 'Service Worker', element: 'sw-status' },
+                { name: 'Manifest', element: 'manifest-status' },
+                { name: 'Instalação', element: 'install-status' },
+                { name: 'Cache', element: 'cache-status' },
+                { name: 'Offline', element: 'offline-status' },
+                { name: 'Notificações', element: 'notification-status' }
+            ];
+            
+            let passed = 0;
+            let summary = '<h4>Resumo dos Testes:</h4><ul>';
+            
+            tests.forEach(test => {
+                const element = document.getElementById(test.element);
+                const status = element.className.includes('success') ? 'PASSOU' : 
+                              element.className.includes('warning') ? 'AVISO' : 'FALHOU';
+                
+                if (status === 'PASSOU') passed++;
+                
+                summary += `<li><strong>${test.name}:</strong> ${status}</li>`;
+            });
+            
+            summary += '</ul>';
+            summary += `<p><strong>Resultado:</strong> ${passed}/${tests.length} testes passaram</p>`;
+            
+            const reportType = passed === tests.length ? 'success' : 
+                              passed >= tests.length / 2 ? 'warning' : 'error';
+            
+            updateStatus('full-report', reportType, `Testes concluídos: ${passed}/${tests.length}`);
+            updateDetails('full-report', summary);
+        }
+    </script>
+</body>
+</html>

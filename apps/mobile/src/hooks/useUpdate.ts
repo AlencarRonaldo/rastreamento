@@ -4,7 +4,12 @@ import UpdateService, { UpdateInfo, UpdateStatus } from '../services/updateServi
 interface UseUpdateReturn {
   updateInfo: UpdateInfo | null;
   status: UpdateStatus;
+  hasUpdateAvailable: boolean;
+  isUpdateForced: boolean;
+  isDownloading: boolean;
+  downloadProgress: number;
   checkForUpdates: (showDialog?: boolean) => Promise<UpdateInfo | null>;
+  downloadUpdate: () => Promise<void>;
   downloadAndInstall: () => Promise<void>;
   restartApp: () => Promise<void>;
   clearCache: () => Promise<void>;
@@ -40,6 +45,22 @@ export const useUpdate = (): UseUpdateReturn => {
       return null;
     }
   }, []);
+
+  const downloadUpdate = useCallback(async (): Promise<void> => {
+    try {
+      if (updateInfo) {
+        // Fallback: use downloadAndInstallUpdate if downloadUpdate doesn't exist
+        if (UpdateService.downloadUpdate) {
+          await UpdateService.downloadUpdate(updateInfo);
+        } else {
+          await UpdateService.downloadAndInstallUpdate(updateInfo);
+        }
+      }
+    } catch (error) {
+      console.error('Error downloading update:', error);
+      throw error;
+    }
+  }, [updateInfo]);
 
   const downloadAndInstall = useCallback(async (): Promise<void> => {
     try {
@@ -82,7 +103,12 @@ export const useUpdate = (): UseUpdateReturn => {
   return {
     updateInfo,
     status,
+    hasUpdateAvailable: !!updateInfo,
+    isUpdateForced: updateInfo?.isForced || false,
+    isDownloading: status.isDownloading,
+    downloadProgress: status.progress || 0,
     checkForUpdates,
+    downloadUpdate,
     downloadAndInstall,
     restartApp,
     clearCache,

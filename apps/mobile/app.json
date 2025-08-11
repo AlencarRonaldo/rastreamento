@@ -15,7 +15,11 @@
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 5000,
-      "url": "https://u.expo.dev/your-project-id"
+      "url": "https://u.expo.dev/your-project-id",
+      "requestHeaders": {
+        "expo-platform": "ios|android",
+        "expo-release-channel": "production"
+      }
     },
     "assetBundlePatterns": [
       "**/*"

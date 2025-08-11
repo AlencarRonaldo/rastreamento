@@ -23,10 +23,15 @@ import RoutesHistoryScreen from './src/screens/RoutesHistoryScreen';
 import AlertsScreen from './src/screens/AlertsScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 
+// Components
+import { UpdateBanner } from './src/components/UpdateBanner';
+import UpdateModal from './src/components/UpdateModal';
+
 // Services
 import { initializeNotifications } from './src/services/notifications';
 import { initializeSocket } from './src/services/socket';
 import { useAuthStore } from './src/store/authStore';
+import { useUpdate } from './src/hooks/useUpdate';
 
 // Types
 import { RootStackParamList, MainTabParamList } from './src/types/navigation';
@@ -125,6 +130,7 @@ function MainTabs() {
 
 export default function App() {
   const { isAuthenticated, initializeAuth } = useAuthStore();
+  const { hasUpdateAvailable, isUpdateForced } = useUpdate();
 
   useEffect(() => {
     // Inicializar autenticação
@@ -213,6 +219,23 @@ export default function App() {
               </>
             )}
           </Stack.Navigator>
+
+          {/* Update components */}
+          {hasUpdateAvailable && !isUpdateForced && <UpdateBanner />}
+          {isUpdateForced && (
+            <UpdateModal
+              visible={isUpdateForced}
+              updateInfo={{
+                version: '1.0.1',
+                releaseDate: new Date(),
+                changelog: ['Melhorias de performance', 'Correções de bugs'],
+                isForced: true,
+                downloadSize: 1024 * 1024 * 5 // 5MB
+              }}
+              onClose={() => {}}
+              onUpdate={() => {}}
+            />
+          )}
         </NavigationContainer>
       </SafeAreaProvider>
     </GestureHandlerRootView>

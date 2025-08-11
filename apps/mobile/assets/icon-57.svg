@@ -1,0 +1,28 @@
+
+<svg width="57" height="57" viewBox="0 0 57 57" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2563eb;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1e40af;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="28.5" cy="28.5" r="28.5" fill="url(#bg)"/>
+  
+  <!-- Vehicle body -->
+  <rect x="11.4" y="19.95" width="34.199999999999996" height="11.4" rx="2.85" fill="white"/>
+  <rect x="14.25" y="17.099999999999998" width="28.5" height="8.549999999999999" rx="1.71" fill="white"/>
+  
+  <!-- Wheels -->
+  <circle cx="17.099999999999998" cy="37.050000000000004" r="4.5600000000000005" fill="white"/>
+  <circle cx="39.9" cy="37.050000000000004" r="4.5600000000000005" fill="white"/>
+  <circle cx="17.099999999999998" cy="37.050000000000004" r="2.85" fill="#374151"/>
+  <circle cx="39.9" cy="37.050000000000004" r="2.85" fill="#374151"/>
+  
+  <!-- GPS signal waves -->
+  <circle cx="28.5" cy="14.25" r="1.1400000000000001" fill="white"/>
+  <circle cx="28.5" cy="14.25" r="2.85" fill="none" stroke="white" stroke-width="0.5700000000000001" opacity="0.6"/>
+  <circle cx="28.5" cy="14.25" r="4.5600000000000005" fill="none" stroke="white" stroke-width="0.5700000000000001" opacity="0.4"/>
+  <circle cx="28.5" cy="14.25" r="6.2700000000000005" fill="none" stroke="white" stroke-width="0.5700000000000001" opacity="0.2"/>
+</svg>
