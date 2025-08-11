@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import { financialRoutes } from './routes/financial.routes';
 
 async function buildApp() {
   const app = Fastify({
@@ -16,6 +17,9 @@ async function buildApp() {
     credentials: true
   });
 
+  // Register financial routes
+  await app.register(financialRoutes, { prefix: '/api' });
+
   // Routes
   app.get('/', async (request, reply) => {
     return {
@@ -25,7 +29,8 @@ async function buildApp() {
       endpoints: {
         health: '/health',
         status: '/api/status',
-        vehicles: '/api/vehicles'
+        vehicles: '/api/vehicles',
+        financial: '/api/financial'
       },
       documentation: 'Sistema de rastreamento veicular'
     };

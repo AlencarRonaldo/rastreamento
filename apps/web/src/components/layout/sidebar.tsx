@@ -18,7 +18,9 @@ import {
   Truck,
   LogOut,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  CreditCard,
+  Wrench
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -58,6 +60,18 @@ const navigationItems = [
     href: '/monitoring',
     icon: Activity,
     description: 'Status em tempo real',
+  },
+  {
+    name: 'Financeiro',
+    href: '/financeiro',
+    icon: CreditCard,
+    description: 'Planos e pagamentos',
+  },
+  {
+    name: 'Serviços',
+    href: '/services',
+    icon: Wrench,
+    description: 'Assistência 24h',
   },
 ];
 
