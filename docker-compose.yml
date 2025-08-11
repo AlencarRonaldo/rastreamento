@@ -1,0 +1,188 @@
+version: '3.8'
+
+services:
+  # Banco de dados com suporte geoespacial
+  postgres:
+    image: postgis/postgis:15-3.3
+    container_name: vehicle-tracking-postgres
+    environment:
+      POSTGRES_DB: tracking_db
+      POSTGRES_USER: tracking_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-tracking_pass}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./apps/backend/prisma/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tracking_user -d tracking_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vehicle-tracking-network
+
+  # Cache e fila Redis
+  redis:
+    image: redis:7-alpine
+    container_name: vehicle-tracking-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_pass}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vehicle-tracking-network
+
+  # Backend API + GPS Server
+  backend:
+    build: 
+      context: ./apps/backend
+      dockerfile: Dockerfile
+      target: development
+    container_name: vehicle-tracking-backend
+    ports:
+      - "3001:3001"  # API HTTP
+      - "3002:3002"  # WebSocket
+      - "5001:5001"  # GPS TCP
+      - "5002:5002"  # GPS UDP
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: postgresql://tracking_user:${DB_PASSWORD:-tracking_pass}@postgres:5432/tracking_db
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_pass}@redis:6379
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-your-super-secret-refresh-key}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID}
+      FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL}
+      FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
+      PORT: 3001
+      WS_PORT: 3002
+      GPS_TCP_PORT: 5001
+      GPS_UDP_PORT: 5002
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./apps/backend:/app
+      - /app/node_modules
+      - ./apps/backend/logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - vehicle-tracking-network
+
+  # Nginx para servir web app e proxy reverso
+  nginx:
+    image: nginx:alpine
+    container_name: vehicle-tracking-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./apps/web/dist:/usr/share/nginx/html
+      - ./ssl:/etc/nginx/ssl
+      - ./nginx/logs:/var/log/nginx
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - vehicle-tracking-network
+
+  # Redis Commander para debug
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: vehicle-tracking-redis-commander
+    environment:
+      REDIS_HOSTS: local:redis:6379:0:${REDIS_PASSWORD:-redis_pass}
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    profiles:
+      - debug
+    networks:
+      - vehicle-tracking-network
+
+  # PgAdmin para debug do banco
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: vehicle-tracking-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@vehicletracking.com
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "8080:80"
+    depends_on:
+      - postgres
+    profiles:
+      - debug
+    networks:
+      - vehicle-tracking-network
+
+  # Prometheus para monitoramento
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: vehicle-tracking-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    profiles:
+      - monitoring
+    networks:
+      - vehicle-tracking-network
+
+  # Grafana para dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: vehicle-tracking-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin123}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    profiles:
+      - monitoring
+    networks:
+      - vehicle-tracking-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  vehicle-tracking-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

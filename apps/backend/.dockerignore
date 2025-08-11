@@ -1,0 +1,110 @@
+# ===========================================
+# DOCKER IGNORE FILE FOR BACKEND
+# ===========================================
+# Exclude unnecessary files from Docker context
+
+# Node.js
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.node_repl_history
+
+# Development files
+.env*
+!.env.example
+src/
+*.ts
+!dist/
+tsconfig.json
+tsx.config.json
+nodemon.json
+
+# Testing
+__tests__/
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+coverage/
+.nyc_output
+jest.config.js
+
+# Build artifacts
+dist/
+build/
+.next/
+out/
+
+# Logs
+logs/
+*.log
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Runtime data
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+CHANGELOG.md
+CONTRIBUTING.md
+docs/
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+.temp/
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Uploads (runtime generated)
+uploads/
+
+# Database files
+*.sqlite
+*.db
+
+# Backup files
+*.backup
+*.bak
+*.old
+
+# IDE and editor files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Package manager files
+.pnpm-debug.log*
+.yarn-integrity
+yarn.lock
+pnpm-lock.yaml
+
+# SuperClaude specific
+.superclaude/
+superclaude.log
+
+# Docker files (don't include in build context)
+Dockerfile*
+docker-compose*.yml
+.dockerignore

@@ -1,0 +1,1025 @@
+// ===========================================
+// PRISMA SCHEMA FOR VEHICLE TRACKING SYSTEM
+// ===========================================
+// Complete database schema with geospatial support
+// Generated with SuperClaude Framework v3.0.0
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+  binaryTargets   = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis(version: "3.3")]
+}
+
+// ===========================================
+// USER MANAGEMENT
+// ===========================================
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  username    String?  @unique
+  password    String
+  firstName   String?
+  lastName    String?
+  phone       String?
+  avatar      String?
+  role        UserRole @default(USER)
+  status      UserStatus @default(ACTIVE)
+  
+  // Metadata
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  lastLoginAt DateTime?
+  deletedAt   DateTime? // Soft delete
+  
+  // Preferences
+  preferences Json?     @default("{}")
+  timezone    String?   @default("UTC")
+  language    String?   @default("en")
+  
+  // Relations
+  vehicles           Vehicle[]        @relation("UserVehicles")
+  sharedVehicles     VehicleShare[]   @relation("SharedWithUser")
+  createdVehicles    Vehicle[]        @relation("CreatedByUser")
+  alerts             Alert[]          @relation("UserAlerts")
+  notifications      Notification[]   @relation("UserNotifications")
+  geofences          Geofence[]       @relation("UserGeofences")
+  reports            Report[]         @relation("UserReports")
+  sessions           UserSession[]    @relation("UserSessions")
+  auditLogs          AuditLog[]       @relation("UserAuditLogs")
+  
+  @@map("users")
+  @@index([email])
+  @@index([status, deletedAt])
+  @@index([createdAt])
+}
+
+model UserSession {
+  id          String    @id @default(cuid())
+  userId      String
+  token       String    @unique
+  refreshToken String   @unique
+  expiresAt   DateTime
+  refreshExpiresAt DateTime
+  ipAddress   String?
+  userAgent   String?
+  deviceInfo  Json?     @default("{}")
+  createdAt   DateTime  @default(now())
+  revokedAt   DateTime?
+  
+  user        User      @relation("UserSessions", fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("user_sessions")
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+  USER
+  VIEWER
+  
+  @@map("user_role")
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING
+  
+  @@map("user_status")
+}
+
+// ===========================================
+// VEHICLE MANAGEMENT
+// ===========================================
+
+model Vehicle {
+  id          String      @id @default(cuid())
+  name        String
+  make        String?
+  model       String?
+  year        Int?
+  color       String?
+  licensePlate String?    @unique
+  vin         String?     @unique
+  
+  // Ownership
+  ownerId     String
+  createdById String
+  
+  // Status
+  status      VehicleStatus @default(ACTIVE)
+  isOnline    Boolean     @default(false)
+  lastSeen    DateTime?
+  
+  // Configuration
+  config      Json?       @default("{}")
+  
+  // Metadata
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  deletedAt   DateTime?   // Soft delete
+  
+  // Relations
+  owner           User            @relation("UserVehicles", fields: [ownerId], references: [id])
+  createdBy       User            @relation("CreatedByUser", fields: [createdById], references: [id])
+  shares          VehicleShare[]  @relation("VehicleShares")
+  devices         Device[]        @relation("VehicleDevices")
+  locations       Location[]      @relation("VehicleLocations")
+  trips           Trip[]          @relation("VehicleTrips")
+  alerts          Alert[]         @relation("VehicleAlerts")
+  maintenance     Maintenance[]   @relation("VehicleMaintenance")
+  fuel            FuelLog[]       @relation("VehicleFuel")
+  geofenceEvents  GeofenceEvent[] @relation("VehicleGeofenceEvents")
+  
+  @@map("vehicles")
+  @@index([ownerId])
+  @@index([licensePlate])
+  @@index([status, deletedAt])
+  @@index([isOnline])
+  @@index([createdAt])
+}
+
+model VehicleShare {
+  id          String        @id @default(cuid())
+  vehicleId   String
+  userId      String
+  permissions VehiclePermission[]
+  
+  createdAt   DateTime      @default(now())
+  expiresAt   DateTime?
+  
+  vehicle     Vehicle       @relation("VehicleShares", fields: [vehicleId], references: [id], onDelete: Cascade)
+  user        User          @relation("SharedWithUser", fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([vehicleId, userId])
+  @@map("vehicle_shares")
+  @@index([userId])
+  @@index([vehicleId])
+}
+
+enum VehicleStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+  DECOMMISSIONED
+  
+  @@map("vehicle_status")
+}
+
+enum VehiclePermission {
+  VIEW
+  TRACK
+  CONTROL
+  MANAGE
+  ALERTS
+  REPORTS
+  
+  @@map("vehicle_permission")
+}
+
+// ===========================================
+// DEVICE MANAGEMENT
+// ===========================================
+
+model Device {
+  id          String      @id @default(cuid())
+  imei        String      @unique
+  serialNumber String?    @unique
+  model       String?
+  manufacturer String?
+  firmwareVersion String?
+  
+  // Association
+  vehicleId   String?
+  
+  // Status
+  status      DeviceStatus @default(INACTIVE)
+  isOnline    Boolean     @default(false)
+  lastSeen    DateTime?
+  lastPing    DateTime?
+  
+  // Network
+  simNumber   String?
+  networkOperator String?
+  signalStrength Int?      @default(0)
+  
+  // Configuration
+  config      Json?       @default("{}")
+  settings    Json?       @default("{}")
+  
+  // Metadata
+  activatedAt DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  
+  // Relations
+  vehicle     Vehicle?    @relation("VehicleDevices", fields: [vehicleId], references: [id])
+  locations   Location[]  @relation("DeviceLocations")
+  commands    Command[]   @relation("DeviceCommands")
+  alerts      Alert[]     @relation("DeviceAlerts")
+  
+  @@map("devices")
+  @@index([imei])
+  @@index([vehicleId])
+  @@index([status])
+  @@index([isOnline])
+  @@index([lastSeen])
+}
+
+enum DeviceStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+  SUSPENDED
+  LOST
+  
+  @@map("device_status")
+}
+
+// ===========================================
+// LOCATION TRACKING
+// ===========================================
+
+model Location {
+  id          String    @id @default(cuid())
+  
+  // Device/Vehicle reference
+  deviceId    String
+  vehicleId   String
+  
+  // Geospatial data (PostGIS Point type)
+  coordinates Unsupported("geography(Point, 4326)")
+  latitude    Float
+  longitude   Float
+  altitude    Float?    @default(0)
+  accuracy    Float?    @default(0)
+  
+  // Movement data
+  speed       Float?    @default(0)     // km/h
+  heading     Float?    @default(0)     // degrees (0-360)
+  satellites  Int?      @default(0)
+  
+  // Status
+  isValid     Boolean   @default(true)
+  isIgnition  Boolean?  @default(false)
+  
+  // Raw data
+  rawData     Json?     @default("{}")
+  
+  // Timestamps
+  timestamp   DateTime  // GPS timestamp
+  serverTime  DateTime  @default(now()) // Server received timestamp
+  
+  // Relations
+  device      Device    @relation("DeviceLocations", fields: [deviceId], references: [id])
+  vehicle     Vehicle   @relation("VehicleLocations", fields: [vehicleId], references: [id])
+  
+  @@map("locations")
+  @@index([deviceId])
+  @@index([vehicleId])
+  @@index([timestamp])
+  @@index([serverTime])
+  @@index([coordinates], type: Gist) // Geospatial index
+  @@index([latitude, longitude])
+}
+
+// ===========================================
+// TRIP MANAGEMENT
+// ===========================================
+
+model Trip {
+  id          String    @id @default(cuid())
+  vehicleId   String
+  
+  // Trip details
+  name        String?
+  description String?
+  
+  // Start/End locations
+  startLatitude   Float
+  startLongitude  Float
+  endLatitude     Float?
+  endLongitude    Float?
+  
+  // Start/End addresses (geocoded)
+  startAddress    String?
+  endAddress      String?
+  
+  // Trip metrics
+  distance    Float?    @default(0)     // km
+  duration    Int?      @default(0)     // seconds
+  maxSpeed    Float?    @default(0)     // km/h
+  avgSpeed    Float?    @default(0)     // km/h
+  fuelUsed    Float?    @default(0)     // liters
+  
+  // Status
+  status      TripStatus @default(ACTIVE)
+  
+  // Timestamps
+  startTime   DateTime
+  endTime     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  vehicle     Vehicle   @relation("VehicleTrips", fields: [vehicleId], references: [id])
+  events      TripEvent[] @relation("TripEvents")
+  
+  @@map("trips")
+  @@index([vehicleId])
+  @@index([status])
+  @@index([startTime])
+  @@index([endTime])
+}
+
+model TripEvent {
+  id          String      @id @default(cuid())
+  tripId      String
+  type        TripEventType
+  description String?
+  
+  // Location
+  latitude    Float
+  longitude   Float
+  address     String?
+  
+  // Data
+  data        Json?       @default("{}")
+  
+  // Timestamp
+  timestamp   DateTime
+  createdAt   DateTime    @default(now())
+  
+  // Relations
+  trip        Trip        @relation("TripEvents", fields: [tripId], references: [id], onDelete: Cascade)
+  
+  @@map("trip_events")
+  @@index([tripId])
+  @@index([type])
+  @@index([timestamp])
+}
+
+enum TripStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  PAUSED
+  
+  @@map("trip_status")
+}
+
+enum TripEventType {
+  START
+  END
+  STOP
+  IDLE
+  SPEEDING
+  HARSH_BRAKING
+  HARSH_ACCELERATION
+  SHARP_TURN
+  GEOFENCE_ENTER
+  GEOFENCE_EXIT
+  
+  @@map("trip_event_type")
+}
+
+// ===========================================
+// GEOFENCING
+// ===========================================
+
+model Geofence {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  
+  // Owner
+  userId      String
+  
+  // Geometry (supports various shapes)
+  geometry    Unsupported("geography")  // PostGIS geography type
+  type        GeofenceType  @default(CIRCLE)
+  
+  // Circle specific (for backward compatibility)
+  centerLatitude  Float?
+  centerLongitude Float?
+  radius      Float?        // meters
+  
+  // Polygon vertices (for complex shapes)
+  vertices    Json?         @default("[]")
+  
+  // Configuration
+  isActive    Boolean       @default(true)
+  color       String?       @default("#3B82F6")
+  
+  // Notifications
+  notifyEntry Boolean       @default(true)
+  notifyExit  Boolean       @default(true)
+  
+  // Metadata
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  
+  // Relations
+  user        User          @relation("UserGeofences", fields: [userId], references: [id])
+  events      GeofenceEvent[] @relation("GeofenceEvents")
+  vehicles    GeofenceVehicle[] @relation("GeofenceVehicles")
+  
+  @@map("geofences")
+  @@index([userId])
+  @@index([isActive])
+  @@index([geometry], type: Gist) // Geospatial index
+}
+
+model GeofenceVehicle {
+  id          String    @id @default(cuid())
+  geofenceId  String
+  vehicleId   String
+  
+  createdAt   DateTime  @default(now())
+  
+  geofence    Geofence  @relation("GeofenceVehicles", fields: [geofenceId], references: [id], onDelete: Cascade)
+  vehicle     Vehicle   @relation(name: "VehicleGeofences", fields: [vehicleId], references: [id], onDelete: Cascade)
+  
+  @@unique([geofenceId, vehicleId])
+  @@map("geofence_vehicles")
+}
+
+model GeofenceEvent {
+  id          String          @id @default(cuid())
+  geofenceId  String
+  vehicleId   String
+  
+  type        GeofenceEventType
+  
+  // Location
+  latitude    Float
+  longitude   Float
+  
+  // Metadata
+  timestamp   DateTime
+  createdAt   DateTime        @default(now())
+  
+  // Relations
+  geofence    Geofence        @relation("GeofenceEvents", fields: [geofenceId], references: [id])
+  vehicle     Vehicle         @relation("VehicleGeofenceEvents", fields: [vehicleId], references: [id])
+  
+  @@map("geofence_events")
+  @@index([geofenceId])
+  @@index([vehicleId])
+  @@index([type])
+  @@index([timestamp])
+}
+
+enum GeofenceType {
+  CIRCLE
+  POLYGON
+  RECTANGLE
+  
+  @@map("geofence_type")
+}
+
+enum GeofenceEventType {
+  ENTER
+  EXIT
+  
+  @@map("geofence_event_type")
+}
+
+// ===========================================
+// ALERT SYSTEM
+// ===========================================
+
+model Alert {
+  id          String      @id @default(cuid())
+  title       String
+  message     String
+  type        AlertType
+  severity    AlertSeverity @default(MEDIUM)
+  category    AlertCategory @default(GENERAL)
+  
+  // References
+  userId      String?
+  vehicleId   String?
+  deviceId    String?
+  
+  // Status
+  status      AlertStatus @default(ACTIVE)
+  isRead      Boolean     @default(false)
+  readAt      DateTime?
+  
+  // Location (optional)
+  latitude    Float?
+  longitude   Float?
+  address     String?
+  
+  // Data
+  data        Json?       @default("{}")
+  
+  // Metadata
+  occurredAt  DateTime    @default(now())
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  resolvedAt  DateTime?
+  
+  // Relations
+  user        User?       @relation("UserAlerts", fields: [userId], references: [id])
+  vehicle     Vehicle?    @relation("VehicleAlerts", fields: [vehicleId], references: [id])
+  device      Device?     @relation("DeviceAlerts", fields: [deviceId], references: [id])
+  notifications Notification[] @relation("AlertNotifications")
+  
+  @@map("alerts")
+  @@index([userId])
+  @@index([vehicleId])
+  @@index([deviceId])
+  @@index([type, severity])
+  @@index([status])
+  @@index([occurredAt])
+}
+
+enum AlertType {
+  SPEED_VIOLATION
+  GEOFENCE_ENTRY
+  GEOFENCE_EXIT
+  PANIC_BUTTON
+  LOW_BATTERY
+  DEVICE_OFFLINE
+  HARSH_BRAKING
+  HARSH_ACCELERATION
+  ACCIDENT
+  MAINTENANCE_DUE
+  FUEL_LOW
+  UNAUTHORIZED_USAGE
+  TAMPERING
+  CUSTOM
+  
+  @@map("alert_type")
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+  
+  @@map("alert_severity")
+}
+
+enum AlertCategory {
+  SAFETY
+  SECURITY
+  MAINTENANCE
+  PERFORMANCE
+  GENERAL
+  
+  @@map("alert_category")
+}
+
+enum AlertStatus {
+  ACTIVE
+  ACKNOWLEDGED
+  RESOLVED
+  DISMISSED
+  
+  @@map("alert_status")
+}
+
+// ===========================================
+// NOTIFICATION SYSTEM
+// ===========================================
+
+model Notification {
+  id          String            @id @default(cuid())
+  userId      String
+  alertId     String?
+  
+  title       String
+  message     String
+  type        NotificationType
+  channel     NotificationChannel[]
+  
+  // Status
+  status      NotificationStatus @default(PENDING)
+  isRead      Boolean           @default(false)
+  readAt      DateTime?
+  
+  // Delivery
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  failedAt    DateTime?
+  retryCount  Int               @default(0)
+  
+  // Data
+  data        Json?             @default("{}")
+  
+  // Metadata
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  
+  // Relations
+  user        User              @relation("UserNotifications", fields: [userId], references: [id])
+  alert       Alert?            @relation("AlertNotifications", fields: [alertId], references: [id])
+  
+  @@map("notifications")
+  @@index([userId])
+  @@index([alertId])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+}
+
+enum NotificationType {
+  PUSH
+  EMAIL
+  SMS
+  IN_APP
+  WEBHOOK
+  
+  @@map("notification_type")
+}
+
+enum NotificationChannel {
+  PUSH
+  EMAIL
+  SMS
+  IN_APP
+  WEBHOOK
+  
+  @@map("notification_channel")
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  CANCELLED
+  
+  @@map("notification_status")
+}
+
+// ===========================================
+// COMMAND SYSTEM
+// ===========================================
+
+model Command {
+  id          String        @id @default(cuid())
+  deviceId    String
+  
+  type        CommandType
+  command     String
+  parameters  Json?         @default("{}")
+  
+  // Status
+  status      CommandStatus @default(PENDING)
+  response    String?
+  error       String?
+  
+  // Timing
+  sentAt      DateTime?
+  responseAt  DateTime?
+  timeoutAt   DateTime?
+  
+  // Metadata
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  
+  // Relations
+  device      Device        @relation("DeviceCommands", fields: [deviceId], references: [id])
+  
+  @@map("commands")
+  @@index([deviceId])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+}
+
+enum CommandType {
+  LOCATE
+  LOCK
+  UNLOCK
+  ENGINE_ON
+  ENGINE_OFF
+  HORN
+  LIGHTS
+  RESET
+  REBOOT
+  UPDATE_SETTINGS
+  CUSTOM
+  
+  @@map("command_type")
+}
+
+enum CommandStatus {
+  PENDING
+  SENT
+  ACKNOWLEDGED
+  EXECUTED
+  FAILED
+  TIMEOUT
+  CANCELLED
+  
+  @@map("command_status")
+}
+
+// ===========================================
+// MAINTENANCE SYSTEM
+// ===========================================
+
+model Maintenance {
+  id              String            @id @default(cuid())
+  vehicleId       String
+  
+  type            MaintenanceType
+  title           String
+  description     String?
+  
+  // Scheduling
+  scheduledAt     DateTime?
+  completedAt     DateTime?
+  nextDueAt       DateTime?
+  
+  // Metrics
+  odometerReading Int?              // km
+  cost            Float?            @default(0)
+  currency        String?           @default("USD")
+  
+  // Status
+  status          MaintenanceStatus @default(SCHEDULED)
+  priority        MaintenancePriority @default(MEDIUM)
+  
+  // Service details
+  serviceProvider String?
+  notes           String?
+  attachments     String[]          @default([])
+  
+  // Metadata
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  // Relations
+  vehicle         Vehicle           @relation("VehicleMaintenance", fields: [vehicleId], references: [id])
+  
+  @@map("maintenance")
+  @@index([vehicleId])
+  @@index([status])
+  @@index([type])
+  @@index([scheduledAt])
+  @@index([nextDueAt])
+}
+
+enum MaintenanceType {
+  OIL_CHANGE
+  TIRE_ROTATION
+  BRAKE_SERVICE
+  ENGINE_SERVICE
+  TRANSMISSION_SERVICE
+  BATTERY_SERVICE
+  INSPECTION
+  REPAIR
+  CUSTOM
+  
+  @@map("maintenance_type")
+}
+
+enum MaintenanceStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  OVERDUE
+  
+  @@map("maintenance_status")
+}
+
+enum MaintenancePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+  
+  @@map("maintenance_priority")
+}
+
+// ===========================================
+// FUEL MANAGEMENT
+// ===========================================
+
+model FuelLog {
+  id          String    @id @default(cuid())
+  vehicleId   String
+  
+  // Fuel details
+  amount      Float     // liters
+  cost        Float?    @default(0)
+  currency    String?   @default("USD")
+  pricePerLiter Float?  @default(0)
+  
+  // Location
+  latitude    Float?
+  longitude   Float?
+  address     String?
+  stationName String?
+  
+  // Odometer
+  odometerReading Int?  // km
+  
+  // Type
+  type        FuelType  @default(GASOLINE)
+  
+  // Metadata
+  notes       String?
+  receipt     String?   // File path
+  filledAt    DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  vehicle     Vehicle   @relation("VehicleFuel", fields: [vehicleId], references: [id])
+  
+  @@map("fuel_logs")
+  @@index([vehicleId])
+  @@index([filledAt])
+  @@index([type])
+}
+
+enum FuelType {
+  GASOLINE
+  DIESEL
+  ELECTRIC
+  HYBRID
+  LPG
+  CNG
+  
+  @@map("fuel_type")
+}
+
+// ===========================================
+// REPORTING SYSTEM
+// ===========================================
+
+model Report {
+  id          String      @id @default(cuid())
+  userId      String
+  
+  name        String
+  description String?
+  type        ReportType
+  format      ReportFormat @default(PDF)
+  
+  // Filters
+  filters     Json        @default("{}")
+  
+  // Schedule
+  isScheduled Boolean     @default(false)
+  schedule    String?     // Cron expression
+  timezone    String?     @default("UTC")
+  
+  // Status
+  status      ReportStatus @default(DRAFT)
+  
+  // Generated files
+  filePath    String?
+  fileSize    Int?        // bytes
+  
+  // Timing
+  generatedAt DateTime?
+  lastRunAt   DateTime?
+  nextRunAt   DateTime?
+  
+  // Metadata
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  
+  // Relations
+  user        User        @relation("UserReports", fields: [userId], references: [id])
+  
+  @@map("reports")
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+  @@index([isScheduled])
+  @@index([nextRunAt])
+}
+
+enum ReportType {
+  LOCATION_HISTORY
+  TRIP_SUMMARY
+  FUEL_CONSUMPTION
+  MAINTENANCE_HISTORY
+  ALERT_SUMMARY
+  GEOFENCE_EVENTS
+  CUSTOM
+  
+  @@map("report_type")
+}
+
+enum ReportFormat {
+  PDF
+  CSV
+  XLSX
+  JSON
+  
+  @@map("report_format")
+}
+
+enum ReportStatus {
+  DRAFT
+  SCHEDULED
+  GENERATING
+  COMPLETED
+  FAILED
+  CANCELLED
+  
+  @@map("report_status")
+}
+
+// ===========================================
+// AUDIT LOGGING
+// ===========================================
+
+model AuditLog {
+  id          String      @id @default(cuid())
+  userId      String?
+  
+  action      String      // CRUD operation
+  resource    String      // Table/Model name
+  resourceId  String?     // ID of affected record
+  
+  // Changes
+  oldValues   Json?       @default("{}")
+  newValues   Json?       @default("{}")
+  
+  // Context
+  ipAddress   String?
+  userAgent   String?
+  method      String?     // HTTP method
+  endpoint    String?     // API endpoint
+  
+  // Metadata
+  timestamp   DateTime    @default(now())
+  
+  // Relations
+  user        User?       @relation("UserAuditLogs", fields: [userId], references: [id])
+  
+  @@map("audit_logs")
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([resourceId])
+  @@index([timestamp])
+}
+
+// ===========================================
+// SYSTEM CONFIGURATION
+// ===========================================
+
+model SystemConfig {
+  id          String    @id @default(cuid())
+  key         String    @unique
+  value       String
+  description String?
+  category    String?   @default("general")
+  type        ConfigType @default(STRING)
+  isEditable  Boolean   @default(true)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@map("system_config")
+  @@index([key])
+  @@index([category])
+}
+
+enum ConfigType {
+  STRING
+  NUMBER
+  BOOLEAN
+  JSON
+  
+  @@map("config_type")
+}
+
+// ===========================================
+// SUPERCLAUDE FRAMEWORK METADATA
+// ===========================================
+// This section contains metadata for SuperClaude framework integration
+
+// Framework: SuperClaude v3.0.0
+// Personas: backend, gps-architect, data
+// Features: gps-tcp-server, rest-api, websocket-gateway, real-time-processing
+// Generated: 2024-08-10
+// Database: PostgreSQL with PostGIS extension
+// Indexes: Optimized for geospatial queries and real-time operations

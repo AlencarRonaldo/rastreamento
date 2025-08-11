@@ -1,0 +1,41 @@
+{
+  "name": "vehicle-tracking-system",
+  "version": "1.0.0",
+  "description": "Sistema de rastreamento veicular",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "start:backend": "cd apps/backend && npm run dev",
+    "start:web": "cd apps/web && npm run dev",
+    "start:mobile": "cd apps/mobile && npm start",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "db:migrate": "cd apps/backend && npx prisma migrate dev",
+    "db:seed": "cd apps/backend && npx prisma db seed"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "keywords": [
+    "vehicle-tracking",
+    "gps",
+    "react-native",
+    "expo",
+    "real-time",
+    "mobile",
+    "web"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}
