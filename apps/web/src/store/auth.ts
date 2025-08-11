@@ -24,15 +24,19 @@ const mockLogin = async (email: string, password: string): Promise<{ user: User;
   // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 1000));
   
-  // Mock successful login
-  if (email === 'admin@tracking.com' && password === 'admin123') {
+  // Mock successful login - support multiple demo accounts
+  if ((email === 'admin@tracking.com' && password === 'admin123') ||
+      (email === 'demo@example.com' && password === '123456')) {
+    
+    const isDemo = email === 'demo@example.com';
+    
     return {
       user: {
-        id: '1',
+        id: isDemo ? '2' : '1',
         email: email,
-        name: 'Administrator',
-        role: 'admin',
-        avatar: 'https://ui-avatars.com/api/?name=Admin&background=3b82f6&color=fff',
+        name: isDemo ? 'Demo User' : 'Administrator',
+        role: isDemo ? 'operator' : 'admin',
+        avatar: `https://ui-avatars.com/api/?name=${isDemo ? 'Demo' : 'Admin'}&background=3b82f6&color=fff`,
         createdAt: new Date('2023-01-01'),
         updatedAt: new Date(),
       },
