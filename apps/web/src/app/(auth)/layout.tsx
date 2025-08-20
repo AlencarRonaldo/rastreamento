@@ -1,5 +1,5 @@
-// Nota: layout em app router deve ser server component por padrão.
-// Removemos 'use client' para evitar incompatibilidades de tipos.
+"use client";
+// Layout precisa ser Client Component pois usa useRouter e Zustand
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';

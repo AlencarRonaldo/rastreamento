@@ -16,14 +16,13 @@ import BillingDashboard from '@/components/financial/BillingDashboard';
 import InvoiceViewer from '@/components/financial/InvoiceViewer';
 
 // Import types
-import type { Plan, Transaction, Invoice, BillingMetrics, PaymentStats, PIXPayment as PIXPaymentType } from '@/types/financial';
+import type { SubscriptionPlan as Plan, Transaction, Invoice, BillingMetrics, PaymentStats, PIXPayment as PIXPaymentType } from '@/types/financial';
 
 // Mock data for demonstration
 const mockPlans: Plan[] = [
   {
     id: 'basic',
     name: 'Básico',
-    description: 'Ideal para pequenas frotas',
     price: 29.90,
     currency: 'BRL',
     interval: 'monthly',
@@ -34,13 +33,16 @@ const mockPlans: Plan[] = [
       'Alertas básicos',
       'Suporte por email'
     ],
-    highlighted: false,
-    maxVehicles: 5
+    popular: false,
+    vehicleLimit: 5,
+    alertsLimit: 50,
+    reportsAccess: true,
+    apiAccess: false,
+    supportLevel: 'basic'
   },
   {
     id: 'premium',
     name: 'Premium',
-    description: 'Para frotas médias com recursos avançados',
     price: 59.90,
     currency: 'BRL',
     interval: 'monthly',
@@ -53,13 +55,16 @@ const mockPlans: Plan[] = [
       'API de integração',
       'Suporte prioritário'
     ],
-    highlighted: true,
-    maxVehicles: 15
+    popular: true,
+    vehicleLimit: 15,
+    alertsLimit: 200,
+    reportsAccess: true,
+    apiAccess: true,
+    supportLevel: 'priority'
   },
   {
     id: 'enterprise',
     name: 'Enterprise',
-    description: 'Solução completa para grandes frotas',
     price: 149.90,
     currency: 'BRL',
     interval: 'monthly',
@@ -73,8 +78,12 @@ const mockPlans: Plan[] = [
       'Suporte dedicado 24/7',
       'Personalização completa'
     ],
-    highlighted: false,
-    maxVehicles: -1
+    popular: false,
+    vehicleLimit: 99999,
+    alertsLimit: 10000,
+    reportsAccess: true,
+    apiAccess: true,
+    supportLevel: 'dedicated'
   }
 ];
 
@@ -120,6 +129,7 @@ const mockInvoices: Invoice[] = [
   {
     id: 'inv_001',
     number: 'INV-2024-001',
+    planId: 'premium',
     status: 'paid',
     amount: 59.90,
     currency: 'BRL',
@@ -150,6 +160,7 @@ const mockInvoices: Invoice[] = [
   {
     id: 'inv_002',
     number: 'INV-2024-002',
+    planId: 'premium',
     status: 'sent',
     amount: 59.90,
     currency: 'BRL',
@@ -224,12 +235,10 @@ export default function FinanceiroPage() {
         setPixPayment({
           id: 'pix_' + Date.now(),
           amount: selectedPlan.price,
-          currency: selectedPlan.currency,
           status: 'pending',
           qrCode: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-          pixCode: '00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-4266554400005204000053039865802BR5913Fulano de Tal6008BRASILIA62070503***63041D3D',
+          pixKey: 'chave-pix-demo@empresa.com',
           expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-          createdAt: new Date().toISOString()
         });
         setLoading(false);
         setActiveTab('payment-pix');
