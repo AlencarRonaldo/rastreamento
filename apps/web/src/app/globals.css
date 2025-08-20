@@ -4,26 +4,37 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    --background: 220 13% 97%;
+    --foreground: 217 19% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 217 19% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
+    --popover-foreground: 217 19% 12%;
+    --primary: 210 98% 45%;
     --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
+    --secondary: 198 89% 94%;
+    --secondary-foreground: 217 19% 12%;
+    --muted: 210 13% 95%;
+    --muted-foreground: 217 12% 50%;
+    --accent: 187 85% 53%;
+    --accent-foreground: 0 0% 98%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
-    --radius: 0.5rem;
+    --border: 210 13% 88%;
+    --input: 210 13% 88%;
+    --ring: 210 98% 45%;
+    --radius: 0.75rem;
+    --success: 120 60% 50%;
+    --success-foreground: 0 0% 98%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 98%;
+    --info: 198 89% 48%;
+    --info-foreground: 0 0% 98%;
+    --automotive-blue: 214 95% 36%;
+    --automotive-teal: 187 85% 53%;
+    --automotive-navy: 217 91% 18%;
+    --trust-gradient-start: 210 98% 45%;
+    --trust-gradient-end: 187 85% 53%;
   }
 
   .dark {
@@ -110,6 +121,61 @@
 
 .animate-pulse {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Professional automotive styling utilities */
+.automotive-gradient {
+  background: linear-gradient(135deg, hsl(var(--trust-gradient-start)) 0%, hsl(var(--trust-gradient-end)) 100%);
+}
+
+.trust-shadow {
+  box-shadow: 0 8px 25px -8px hsl(var(--automotive-blue) / 0.3);
+}
+
+.premium-card {
+  background: linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--secondary)) 100%);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.premium-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 2px;
+  background: linear-gradient(135deg, hsl(var(--automotive-blue)), hsl(var(--automotive-teal)));
+  border-radius: inherit;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  z-index: -1;
+}
+
+.professional-button {
+  background: linear-gradient(135deg, hsl(var(--automotive-blue)) 0%, hsl(var(--automotive-teal)) 100%);
+  transition: all 0.3s ease;
+}
+
+.professional-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px -8px hsl(var(--automotive-blue) / 0.4);
+}
+
+.trust-indicator {
+  background: linear-gradient(135deg, hsl(var(--success)) 0%, hsl(var(--success)) 100%);
+  animation: pulse-success 2s infinite;
+}
+
+@keyframes pulse-success {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+
+.pricing-highlight {
+  background: linear-gradient(135deg, hsl(var(--warning)) 0%, hsl(var(--warning)) 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 700;
 }
 
 /* Responsive utilities */

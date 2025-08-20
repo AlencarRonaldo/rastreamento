@@ -28,7 +28,7 @@ interface VehicleFiltersProps {
 
 // Mock groups data - in real app, this would come from API
 const mockGroups = [
-  { id: '1', name: 'Frota Comercial' },
+  { id: '1', name: 'Veículos Pessoais' },
   { id: '2', name: 'Veículos Leves' },
   { id: '3', name: 'Caminhões' },
   { id: '4', name: 'Emergência' },

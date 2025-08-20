@@ -106,7 +106,7 @@ export default function PlanSelector({ plans, currentPlanId, onSelectPlan, loadi
                 </div>
               </div>
               <div>
-                <span className="text-muted-foreground">Relatórios:</span>
+                <span className="text-muted-foreground">Análises:</span>
                 <div className="font-semibold">
                   {plan.reportsAccess ? 'Sim' : 'Não'}
                 </div>

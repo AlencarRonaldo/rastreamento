@@ -13,6 +13,7 @@ interface StatsCardProps {
   trend?: 'up' | 'down' | 'neutral';
   variant?: 'default' | 'destructive' | 'success';
   className?: string;
+  compact?: boolean;
 }
 
 export function StatsCard({
@@ -23,6 +24,7 @@ export function StatsCard({
   trend = 'neutral',
   variant = 'default',
   className,
+  compact = false,
 }: StatsCardProps) {
   const getTrendIcon = () => {
     switch (trend) {
@@ -59,11 +61,11 @@ export function StatsCard({
 
   return (
     <Card className={cn('', getVariantStyles(), className)}>
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between space-y-0 pb-2">
-          <h3 className="tracking-tight text-sm font-medium">{title}</h3>
+      <CardContent className={compact ? "p-4" : "p-6"}>
+        <div className={cn("flex items-center justify-between space-y-0", compact ? "pb-1" : "pb-2")}>
+          <h3 className={cn("tracking-tight font-medium", compact ? "text-xs" : "text-sm")}>{title}</h3>
           <Icon className={cn(
-            'h-4 w-4',
+            compact ? 'h-3 w-3' : 'h-4 w-4',
             variant === 'destructive' ? 'text-red-500' :
             variant === 'success' ? 'text-green-500' :
             'text-muted-foreground'
@@ -71,12 +73,12 @@ export function StatsCard({
         </div>
         
         <div className="space-y-1">
-          <div className="text-2xl font-bold">{value}</div>
+          <div className={cn("font-bold", compact ? "text-lg" : "text-2xl")}>{value}</div>
           
           {description && (
             <div className="flex items-center gap-1">
-              {getTrendIcon()}
-              <p className={cn('text-xs', getTrendColor())}>
+              {!compact && getTrendIcon()}
+              <p className={cn(compact ? 'text-xs' : 'text-xs', getTrendColor())}>
                 {description}
               </p>
             </div>

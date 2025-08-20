@@ -17,8 +17,8 @@ const backgroundImages: BackgroundImage[] = [
   },
   {
     src: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?q=80&w=2940&auto=format&fit=crop',
-    alt: 'Frota de veículos comerciais em movimento',
-    attribution: 'Commercial Fleet Management'
+    alt: 'Veículos com tecnologia de rastreamento',
+    attribution: 'Vehicle Tracking Technology'
   },
   {
     src: 'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?q=80&w=2940&auto=format&fit=crop',
@@ -27,8 +27,8 @@ const backgroundImages: BackgroundImage[] = [
   },
   {
     src: 'https://images.unsplash.com/photo-1593642632559-0c6d3fc62b89?q=80&w=2940&auto=format&fit=crop',
-    alt: 'Dashboard de análise de dados de frota',
-    attribution: 'Fleet Analytics Dashboard'
+    alt: 'Dashboard de análise de veículos',
+    attribution: 'Vehicle Analytics Dashboard'
   },
   {
     src: 'https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?q=80&w=2940&auto=format&fit=crop',

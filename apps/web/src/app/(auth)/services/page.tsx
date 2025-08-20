@@ -3,7 +3,7 @@
 import { useState } from 'react';
 // Substituir Button por um botão HTML para evitar conflito de tipos no build
 // Substituímos componentes Card por divs estilizadas para evitar conflitos de tipos
-import { toast } from 'react-hot-toast';
+// import { toast } from 'react-hot-toast'; // Comentado temporariamente para debug
 
 interface EmergencyService {
   id: string;
@@ -102,7 +102,7 @@ export default function ServicesPage() {
 
   const handleServiceRequest = (service: EmergencyService) => {
     if (activeRequest) {
-      toast.error('Você já possui uma solicitação ativa!');
+      console.log('Você já possui uma solicitação ativa!');
       return;
     }
 
@@ -124,7 +124,7 @@ export default function ServicesPage() {
     };
 
     setActiveRequest(newRequest);
-    toast.success(`Serviço de ${service.name} solicitado!`);
+    console.log(`Serviço de ${service.name} solicitado!`);
 
     // Simular resposta do sistema
     setTimeout(() => {
@@ -137,13 +137,13 @@ export default function ServicesPage() {
           rating: 4.8
         }
       } : null);
-      toast.success('Profissional designado!');
+      console.log('Profissional designado!');
     }, 3000);
   };
 
   const handleCancelRequest = () => {
     setActiveRequest(null);
-    toast.success('Solicitação cancelada');
+    console.log('Solicitação cancelada');
   };
 
   const getStatusText = (status: string) => {
@@ -173,62 +173,61 @@ export default function ServicesPage() {
         <p className="text-gray-600">Assistência 24 horas para seu veículo</p>
       </div>
 
-      {/* Active Emergency Request */}
+      {/* Active Emergency Request - Compacto */}
       {activeRequest && (
-        <div className="mb-8 border rounded-lg border-red-200 bg-red-50">
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold text-red-800">
+        <div className="mb-6 border rounded-lg border-red-200 bg-red-50">
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold text-red-800">
                 🚨 Emergência Ativa
               </h3>
-              <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(activeRequest.status)}`}>
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(activeRequest.status)}`}>
                 {getStatusText(activeRequest.status)}
               </span>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
               <div>
-                <p className="text-sm text-gray-600">Serviço</p>
-                <p className="font-semibold">{activeRequest.service}</p>
+                <p className="text-xs text-gray-600">Serviço</p>
+                <p className="text-sm font-semibold">{activeRequest.service}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Tempo Estimado</p>
-                <p className="font-semibold">{activeRequest.estimatedTime} minutos</p>
+                <p className="text-xs text-gray-600">Tempo</p>
+                <p className="text-sm font-semibold">{activeRequest.estimatedTime} min</p>
               </div>
-            </div>
-
-            {activeRequest.provider.name !== 'Aguardando...' && (
-              <div className="grid md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <p className="text-sm text-gray-600">Profissional</p>
-                  <p className="font-semibold">{activeRequest.provider.name}</p>
-                  <div className="flex items-center mt-1">
-                    <span className="text-yellow-500">⭐</span>
-                    <span className="text-sm ml-1">{activeRequest.provider.rating}</span>
+              {activeRequest.provider.name !== 'Aguardando...' && (
+                <>
+                  <div>
+                    <p className="text-xs text-gray-600">Profissional</p>
+                    <p className="text-sm font-semibold">{activeRequest.provider.name}</p>
+                    <div className="flex items-center">
+                      <span className="text-yellow-500 text-xs">⭐</span>
+                      <span className="text-xs ml-1">{activeRequest.provider.rating}</span>
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Contato</p>
-                  <p className="font-semibold">{activeRequest.provider.phone}</p>
-                </div>
-              </div>
-            )}
-
-            <div className="mb-4">
-              <p className="text-sm text-gray-600">Localização</p>
-              <p className="font-semibold">{activeRequest.location.address}</p>
+                  <div>
+                    <p className="text-xs text-gray-600">Contato</p>
+                    <p className="text-sm font-semibold">{activeRequest.provider.phone}</p>
+                  </div>
+                </>
+              )}
             </div>
 
-            <div className="flex gap-4">
+            <div className="mb-3">
+              <p className="text-xs text-gray-600">Localização</p>
+              <p className="text-sm font-medium truncate">{activeRequest.location.address}</p>
+            </div>
+
+            <div className="flex gap-2">
               <button
-                className="px-4 py-2 border rounded-md hover:bg-gray-50 disabled:opacity-50"
+                className="px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50"
                 onClick={() => window.open(`tel:${activeRequest.provider.phone}`)}
                 disabled={!activeRequest.provider.phone}
               >
                 📞 Ligar
               </button>
               <button
-                className="px-4 py-2 border rounded-md hover:bg-gray-50"
+                className="px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50"
                 onClick={handleCancelRequest}
               >
                 ❌ Cancelar

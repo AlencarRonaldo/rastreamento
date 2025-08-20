@@ -45,7 +45,7 @@ const navigationItems = [
     icon: AlertTriangle,
   },
   {
-    name: 'Relatórios',
+    name: 'Análises',
     href: '/reports',
     icon: FileText,
   },

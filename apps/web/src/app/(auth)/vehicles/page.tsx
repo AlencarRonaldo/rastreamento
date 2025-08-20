@@ -177,7 +177,7 @@ export default function VehiclesPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Veículos</h1>
           <p className="text-muted-foreground">
-            Gerencie e monitore todos os veículos da sua frota
+            Gerencie e monitore todos os seus veículos
           </p>
         </div>
         
@@ -318,7 +318,7 @@ export default function VehiclesPage() {
             <p className="text-muted-foreground text-center mb-4">
               {filters.search || filters.status !== 'all' || filters.isMoving !== 'all'
                 ? 'Tente ajustar os filtros de busca'
-                : 'Adicione veículos para começar o monitoramento da sua frota'
+                : 'Adicione veículos para começar o monitoramento'
               }
             </p>
             {(!filters.search && filters.status === 'all' && filters.isMoving === 'all') && (

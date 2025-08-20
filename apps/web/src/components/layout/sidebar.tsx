@@ -20,7 +20,8 @@ import {
   ChevronLeft,
   ChevronRight,
   CreditCard,
-  Wrench
+  Wrench,
+  Crown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -35,13 +36,7 @@ const navigationItems = [
     name: 'Veículos',
     href: '/vehicles',
     icon: Car,
-    description: 'Gerenciar frota',
-  },
-  {
-    name: 'Mapa',
-    href: '/map',
-    icon: Map,
-    description: 'Visualização em tempo real',
+    description: 'Gerenciar veículos',
   },
   {
     name: 'Alertas',
@@ -50,7 +45,7 @@ const navigationItems = [
     description: 'Notificações e avisos',
   },
   {
-    name: 'Relatórios',
+    name: 'Análises',
     href: '/reports',
     icon: FileText,
     description: 'Análises e estatísticas',
@@ -66,6 +61,8 @@ const navigationItems = [
     href: '/financeiro',
     icon: CreditCard,
     description: 'Planos e pagamentos',
+    adminFeature: true,
+    adminDescription: 'Dashboard administrativo disponível',
   },
   {
     name: 'Serviços',
@@ -158,6 +155,7 @@ export function Sidebar({ className, collapsed = false, onCollapsedChange }: Sid
           {navigationItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
+            const hasAdminFeature = item.adminFeature && user?.role === 'admin';
             
             return (
               <Link
@@ -178,10 +176,15 @@ export function Sidebar({ className, collapsed = false, onCollapsedChange }: Sid
                 )} />
                 {!localCollapsed && (
                   <div className="flex-1 truncate">
-                    <div className="truncate">{item.name}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="truncate">{item.name}</span>
+                      {hasAdminFeature && (
+                        <Crown className="h-3 w-3 text-amber-500 flex-shrink-0" title="Recursos administrativos disponíveis" />
+                      )}
+                    </div>
                     {!active && (
                       <div className="text-xs text-muted-foreground/70 truncate">
-                        {item.description}
+                        {hasAdminFeature ? item.adminDescription : item.description}
                       </div>
                     )}
                   </div>

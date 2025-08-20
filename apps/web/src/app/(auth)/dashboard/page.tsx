@@ -2,13 +2,13 @@
 
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DynamicMapView as MapView } from '@/components/map/dynamic-map-view';
 import { StatsCard } from '@/components/dashboard/stats-card';
 import { AlertsList } from '@/components/dashboard/alerts-list';
 import { VehiclesList } from '@/components/dashboard/vehicles-list';
 import { ActivityChart } from '@/components/dashboard/activity-chart';
 import { useVehiclesStore } from '@/store/vehicles';
 import { useAuthStore } from '@/store/auth';
+import { cn } from '@/lib/utils';
 import {
   Car,
   Activity,
@@ -51,18 +51,19 @@ export default function DashboardPage() {
           Bem-vindo de volta, {user?.name?.split(' ')[0]}!
         </h1>
         <p className="text-muted-foreground">
-          Aqui está o resumo da sua frota hoje
+          Aqui está o resumo dos seus veículos hoje
         </p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* Stats and Alerts Grid */}
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
         <StatsCard
           title="Total de Veículos"
           value={vehicles.length.toString()}
           description={`${onlineVehicles.length} online`}
           icon={Car}
           trend={onlineVehicles.length > 0 ? 'up' : 'neutral'}
+          compact
         />
         
         <StatsCard
@@ -71,15 +72,7 @@ export default function DashboardPage() {
           description={`de ${vehicles.length} veículos`}
           icon={Activity}
           trend={movingVehicles.length > 0 ? 'up' : 'neutral'}
-        />
-        
-        <StatsCard
-          title="Alertas Ativos"
-          value={activeAlerts.length.toString()}
-          description="Requer atenção"
-          icon={AlertTriangle}
-          trend={activeAlerts.length > 0 ? 'down' : 'up'}
-          variant={activeAlerts.length > 0 ? 'destructive' : 'default'}
+          compact
         />
         
         <StatsCard
@@ -88,92 +81,81 @@ export default function DashboardPage() {
           description="Todos os veículos"
           icon={MapPin}
           trend="up"
+          compact
         />
+
+        {/* Alertas Recentes Card - Enhanced */}
+        <Card className="h-full">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between space-y-0 pb-1">
+              <h3 className="tracking-tight font-medium text-xs">Alertas Recentes</h3>
+              <AlertTriangle className={cn(
+                "h-3 w-3",
+                activeAlerts.length > 0 ? "text-red-500" : "text-muted-foreground"
+              )} />
+            </div>
+            
+            <div className="space-y-1">
+              <div className="text-lg font-bold">{activeAlerts.length}</div>
+              
+              {activeAlerts.length > 0 ? (
+                <div className="space-y-1">
+                  {activeAlerts.slice(0, 2).map((alert, index) => {
+                    const alertTypeLabels = {
+                      speed_limit: 'Excesso de Velocidade',
+                      geofence_enter: 'Entrada em Área',
+                      geofence_exit: 'Saída de Área',
+                      panic_button: 'Botão de Pânico',
+                      engine_on: 'Motor Ligado',
+                      engine_off: 'Motor Desligado',
+                      low_battery: 'Bateria Baixa',
+                      low_fuel: 'Combustível Baixo',
+                      maintenance_due: 'Manutenção Pendente',
+                      device_offline: 'Dispositivo Offline',
+                      accident_detected: 'Acidente Detectado',
+                      harsh_driving: 'Condução Brusca',
+                      idle_time: 'Tempo Parado',
+                      route_deviation: 'Desvio de Rota',
+                    };
+                    
+                    return (
+                      <div key={index} className="text-xs text-muted-foreground border-l-2 border-red-400 pl-2">
+                        <div className="flex items-center gap-1">
+                          <div className="w-1.5 h-1.5 bg-red-400 rounded-full"></div>
+                          <span className="font-medium">{alertTypeLabels[alert.type] || alert.type}</span>
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {alert.message?.includes('Caminhão A001') ? 'Caminhão A001' :
+                           alert.message?.includes('Van B002') ? 'Van B002' :
+                           'Veículo #' + (index + 1)}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {activeAlerts.length > 2 && (
+                    <div className="text-xs text-gray-400 text-center pt-1">
+                      +{activeAlerts.length - 2} mais
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-xs text-green-600 flex items-center gap-1">
+                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                  <span>Tudo normal</span>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Map Section */}
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5" />
-                Mapa em Tempo Real
-              </CardTitle>
-              <CardDescription>
-                Posição atual de todos os veículos da frota
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <MapView
-                vehicles={vehicles}
-                selectedVehicleId={selectedVehicleId}
-                height="400px"
-                onVehicleClick={(vehicle) => handleVehicleClick(vehicle.id)}
-                showRoutes={false}
-                followMode={false}
-              />
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Recent Alerts */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5" />
-                Alertas Recentes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <AlertsList 
-                alerts={activeAlerts.slice(0, 5)} 
-                onAlertClick={(alert) => console.log('Alert clicked:', alert)}
-                compact
-              />
-            </CardContent>
-          </Card>
-
-          {/* Quick Stats */}
-          <div className="grid gap-4">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-blue-500" />
-                    <span className="text-sm font-medium">Velocidade Média</span>
-                  </div>
-                  <span className="text-lg font-bold">{formatSpeed(avgSpeed)}</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-green-500" />
-                    <span className="text-sm font-medium">Tempo Online</span>
-                  </div>
-                  <span className="text-lg font-bold">
-                    {stats?.uptime ? `${stats.uptime.toFixed(1)}%` : '0%'}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
 
       {/* Bottom Section */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Activity Chart */}
         <Card>
           <CardHeader>
-            <CardTitle>Atividade da Frota</CardTitle>
+            <CardTitle>Atividade dos Veículos</CardTitle>
             <CardDescription>
               Movimentação dos veículos nas últimas 24 horas
             </CardDescription>

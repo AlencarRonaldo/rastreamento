@@ -6,11 +6,12 @@ import { ServiceWorkerProvider } from '@/components/ServiceWorkerProvider'
 import UpdateProvider from '@/components/UpdateProvider'
 import { InstallPWA } from '@/components/InstallPWA'
 import { ClientOnlyProvider } from '@/components/ClientOnlyProvider'
-import { Toaster } from 'react-hot-toast'
+// import { Toaster } from 'react-hot-toast' // Comentado temporariamente para debug
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
+  metadataBase: new URL('https://lacerdatrack.com'),
   title: 'Sistema de Rastreamento Veicular',
   description: 'Sistema completo de rastreamento e monitoramento de veículos em tempo real',
   manifest: '/manifest.json',
@@ -103,7 +104,7 @@ export default function RootLayout({
                 <QueryProvider>
                   {children}
                   <InstallPWA />
-                  <Toaster position="top-right" />
+                  {/* <Toaster position="top-right" /> */}
                 </QueryProvider>
               </ThemeProvider>
             </UpdateProvider>

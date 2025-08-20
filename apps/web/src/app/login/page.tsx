@@ -27,7 +27,7 @@ import {
   BarChart3,
   Lock
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+// import toast from 'react-hot-toast'; // Comentado temporariamente
 import Link from 'next/link';
 import BackgroundSlider from '@/components/login/BackgroundSlider';
 import ServiceStats from '@/components/login/ServiceStats';
@@ -66,14 +66,14 @@ export default function LoginPage() {
 
   React.useEffect(() => {
     if (error) {
-      toast.error(error);
+      console.error('Login error:', error);
     }
   }, [error]);
 
   const onSubmit = async (data: LoginForm) => {
     try {
       await login(data.email, data.password, data.remember);
-      toast.success('Login realizado com sucesso!');
+      console.log('Login realizado com sucesso!');
       router.push('/dashboard');
     } catch (error) {
       console.error('Login error:', error);
@@ -83,7 +83,7 @@ export default function LoginPage() {
   const fillDemoCredentials = () => {
     setValue('email', 'demo@example.com');
     setValue('password', 'operator');
-    toast.success('Credenciais de demonstração preenchidas!');
+    console.log('Credenciais de demonstração preenchidas!');
   };
 
   return (
@@ -227,6 +227,23 @@ export default function LoginPage() {
                   </Button>
                 </form>
 
+                {/* Criar Conta Section */}
+                <div className="mt-6 text-center">
+                  <p className="text-sm text-slate-300">
+                    Ainda não tem uma conta?
+                  </p>
+                  <Link
+                    href="/register"
+                    className="inline-flex items-center justify-center mt-3 w-full px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold rounded-lg shadow-lg transition-all duration-200 transform hover:scale-[1.02]"
+                  >
+                    <Users className="mr-2 h-4 w-4" />
+                    Criar Conta Grátis
+                  </Link>
+                  <p className="mt-2 text-xs text-slate-400">
+                    Bloqueio e desbloqueio pelo app • Assistência 24h
+                  </p>
+                </div>
+
                 <div className="mt-6 pt-6 border-t border-white/10">
                   <div className="flex items-center justify-center gap-6 text-slate-400">
                     <div className="flex items-center gap-2">
@@ -269,11 +286,11 @@ export default function LoginPage() {
             {/* Main heading */}
             <div className="mb-12 animate-fade-in">
               <h2 className="text-5xl font-bold text-white mb-6 leading-tight">
-                Controle Total da<br />Sua Frota
+                Proteção Total do<br />Seu Veículo
               </h2>
               <p className="text-xl text-slate-300 leading-relaxed">
                 Tecnologia avançada para monitoramento em tempo real, 
-                gestão eficiente e máxima segurança dos seus veículos.
+                proteção completa e máxima segurança do seu veículo.
               </p>
             </div>
 
