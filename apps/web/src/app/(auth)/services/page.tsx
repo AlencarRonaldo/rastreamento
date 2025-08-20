@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
+// Substituir Button por um botão HTML para evitar conflito de tipos no build
 // Substituímos componentes Card por divs estilizadas para evitar conflitos de tipos
 import { toast } from 'react-hot-toast';
 
@@ -220,16 +220,19 @@ export default function ServicesPage() {
             </div>
 
             <div className="flex gap-4">
-              <Button
-                variant="outline"
+              <button
+                className="px-4 py-2 border rounded-md hover:bg-gray-50 disabled:opacity-50"
                 onClick={() => window.open(`tel:${activeRequest.provider.phone}`)}
                 disabled={!activeRequest.provider.phone}
               >
                 📞 Ligar
-              </Button>
-              <Button variant="outline" onClick={handleCancelRequest}>
+              </button>
+              <button
+                className="px-4 py-2 border rounded-md hover:bg-gray-50"
+                onClick={handleCancelRequest}
+              >
                 ❌ Cancelar
-              </Button>
+              </button>
             </div>
           </div>
         </div>
