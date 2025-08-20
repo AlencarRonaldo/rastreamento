@@ -26,7 +26,7 @@ const mockLogin = async (email: string, password: string): Promise<{ user: User;
   
   // Mock successful login - support multiple demo accounts
   if ((email === 'admin@tracking.com' && password === 'admin123') ||
-      (email === 'demo@example.com' && password === '123456')) {
+      (email === 'demo@example.com' && password === 'operator')) {
     
     const isDemo = email === 'demo@example.com';
     

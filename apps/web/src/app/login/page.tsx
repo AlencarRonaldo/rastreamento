@@ -82,7 +82,7 @@ export default function LoginPage() {
 
   const fillDemoCredentials = () => {
     setValue('email', 'demo@example.com');
-    setValue('password', '123456');
+    setValue('password', 'operator');
     toast.success('Credenciais de demonstração preenchidas!');
   };
 

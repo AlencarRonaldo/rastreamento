@@ -35,6 +35,11 @@ class SocketService {
   private callbacks: Map<string, Function[]> = new Map();
 
   async connect(token: string): Promise<void> {
+    // Permitir desabilitar sockets em ambiente sem backend
+    if (process.env.EXPO_PUBLIC_DISABLE_SOCKET === 'true') {
+      return;
+    }
+
     if (this.socket?.connected || this.isConnecting) {
       return;
     }

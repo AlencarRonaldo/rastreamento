@@ -17,7 +17,9 @@ import {
   Activity,
   Truck,
   LogOut,
-  X
+  X,
+  CreditCard,
+  Wrench
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -51,6 +53,16 @@ const navigationItems = [
     name: 'Monitoramento',
     href: '/monitoring',
     icon: Activity,
+  },
+  {
+    name: 'Financeiro',
+    href: '/financeiro',
+    icon: CreditCard,
+  },
+  {
+    name: 'Serviços',
+    href: '/services',
+    icon: Wrench,
   },
 ];
 

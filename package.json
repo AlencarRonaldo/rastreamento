@@ -7,13 +7,9 @@
     "apps/*"
   ],
   "scripts": {
-    "start:backend": "cd apps/backend && npm run dev",
     "start:web": "cd apps/web && npm run dev",
     "start:mobile": "cd apps/mobile && npm start",
-    "docker:up": "docker-compose up -d",
-    "docker:down": "docker-compose down",
-    "db:migrate": "cd apps/backend && npx prisma migrate dev",
-    "db:seed": "cd apps/backend && npx prisma db seed",
+    "start": "npm run start:web",
     "update:check": "node scripts/update-manager.js check",
     "update:install": "node scripts/update-manager.js install",
     "update:rollback": "node scripts/update-manager.js rollback",

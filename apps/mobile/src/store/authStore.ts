@@ -5,7 +5,6 @@
 
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { api } from '../services/api';
 
 interface User {
   id: string;
@@ -32,29 +31,50 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   login: async (email: string, password: string) => {
     set({ loading: true });
-    
-    try {
-      const response = await api.post('/auth/login', {
-        email,
-        password,
-      });
 
-      const { user, token } = response.data;
+    // Login mockado (sem backend)
+    await new Promise((resolve) => setTimeout(resolve, 600));
 
-      // Salvar no AsyncStorage
-      await AsyncStorage.setItem('auth_token', token);
-      await AsyncStorage.setItem('user_data', JSON.stringify(user));
+    const validUsers: Array<{ email: string; password: string; user: User }> = [
+      {
+        email: 'admin@tracking.com',
+        password: 'admin123',
+        user: {
+          id: '1',
+          email: 'admin@tracking.com',
+          name: 'Administrador',
+          role: 'admin',
+        },
+      },
+      {
+        email: 'demo@example.com',
+        password: 'operator',
+        user: {
+          id: '2',
+          email: 'demo@example.com',
+          name: 'Usuário Demo',
+          role: 'operator',
+        },
+      },
+    ];
 
-      set({
-        user,
-        token,
-        isAuthenticated: true,
-        loading: false,
-      });
-    } catch (error) {
+    const found = validUsers.find((u) => u.email === email && u.password === password);
+    if (!found) {
       set({ loading: false });
-      throw error;
+      throw new Error('Credenciais inválidas');
     }
+
+    const token = `mock-jwt-token-${Date.now()}`;
+
+    await AsyncStorage.setItem('auth_token', token);
+    await AsyncStorage.setItem('user_data', JSON.stringify(found.user));
+
+    set({
+      user: found.user,
+      token,
+      isAuthenticated: true,
+      loading: false,
+    });
   },
 
   logout: async () => {
@@ -82,24 +102,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const userData = await AsyncStorage.getItem('user_data');
 
       if (token && userData) {
-        const user = JSON.parse(userData);
-        
-        // Verificar se o token ainda é válido
-        try {
-          await api.get('/auth/verify', {
-            headers: { Authorization: `Bearer ${token}` }
-          });
+        const user: User = JSON.parse(userData);
 
-          set({
-            user,
-            token,
-            isAuthenticated: true,
-            loading: false,
-          });
-        } catch (error) {
-          // Token inválido, fazer logout
-          await get().logout();
-        }
+        // Sem backend: considerar válido se existir no storage
+        set({
+          user,
+          token,
+          isAuthenticated: true,
+          loading: false,
+        });
       } else {
         set({ loading: false });
       }

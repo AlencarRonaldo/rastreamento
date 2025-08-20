@@ -60,6 +60,9 @@ export default function MapScreen() {
 
   // SuperClaude Context7 - WebSocket Best Practices
   useEffect(() => {
+    if (process.env.EXPO_PUBLIC_DISABLE_SOCKET === 'true') {
+      return;
+    }
     if (token && mapReady) {
       initializeWebSocket();
     }

@@ -32,7 +32,9 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
   const { updateVehiclePosition, addAlert } = useVehiclesStore();
 
   React.useEffect(() => {
-    if (!isAuthenticated || !token) {
+    const socketsDisabled = process.env.NEXT_PUBLIC_DISABLE_SOCKET === 'true';
+
+    if (!isAuthenticated || !token || socketsDisabled) {
       if (socket) {
         socket.disconnect();
         setSocket(null);
