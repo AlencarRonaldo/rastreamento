@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+const webpack = require('webpack');
+
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: [
@@ -61,6 +63,21 @@ const nextConfig = {
   experimental: {
     // serverActions: true,
     forceSwcTransforms: true,
+  },
+  webpack: (config) => {
+    // Polyfills para libs que usam 'process' no browser
+    config.resolve.fallback = {
+      ...(config.resolve.fallback || {}),
+      process: require.resolve('process/browser'),
+    };
+
+    config.plugins.push(
+      new webpack.ProvidePlugin({
+        process: 'process/browser',
+      })
+    );
+
+    return config;
   },
 }
 

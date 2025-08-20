@@ -1,4 +1,5 @@
-'use client';
+// Nota: layout em app router deve ser server component por padrão.
+// Removemos 'use client' para evitar incompatibilidades de tipos.
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
@@ -8,11 +9,7 @@ import { Header } from '@/components/layout/header';
 import { MobileMenu } from '@/components/layout/mobile-menu';
 import { Loader2 } from 'lucide-react';
 
-export default function AuthLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function AuthLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
