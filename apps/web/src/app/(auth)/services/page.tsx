@@ -2,7 +2,12 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import dynamic from 'next/dynamic';
+const Card = dynamic(() => import('@/components/ui/card').then(m => m.Card), { ssr: false });
+const CardContent = dynamic(() => import('@/components/ui/card').then(m => m.CardContent), { ssr: false });
+const CardDescription = dynamic(() => import('@/components/ui/card').then(m => m.CardDescription), { ssr: false });
+const CardHeader = dynamic(() => import('@/components/ui/card').then(m => m.CardHeader), { ssr: false });
+const CardTitle = dynamic(() => import('@/components/ui/card').then(m => m.CardTitle), { ssr: false });
 import { toast } from 'react-hot-toast';
 
 interface EmergencyService {
