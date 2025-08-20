@@ -2,12 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import dynamic from 'next/dynamic';
-const Card = dynamic(() => import('@/components/ui/card').then(m => m.Card), { ssr: false });
-const CardContent = dynamic(() => import('@/components/ui/card').then(m => m.CardContent), { ssr: false });
-const CardDescription = dynamic(() => import('@/components/ui/card').then(m => m.CardDescription), { ssr: false });
-const CardHeader = dynamic(() => import('@/components/ui/card').then(m => m.CardHeader), { ssr: false });
-const CardTitle = dynamic(() => import('@/components/ui/card').then(m => m.CardTitle), { ssr: false });
+// Substituímos componentes Card por divs estilizadas para evitar conflitos de tipos
 import { toast } from 'react-hot-toast';
 
 interface EmergencyService {
@@ -180,7 +175,7 @@ export default function ServicesPage() {
 
       {/* Active Emergency Request */}
       {activeRequest && (
-        <Card className="mb-8 border-red-200 bg-red-50">
+        <div className="mb-8 border rounded-lg border-red-200 bg-red-50">
           <div className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-semibold text-red-800">
@@ -237,15 +232,15 @@ export default function ServicesPage() {
               </Button>
             </div>
           </div>
-        </Card>
+        </div>
       )}
 
       {/* Emergency Services Grid */}
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {emergencyServices.map((service) => (
-          <Card
+          <div
             key={service.id}
-            className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105"
+            className="border rounded-lg cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105"
             onClick={() => handleServiceRequest(service)}
           >
             <div className="p-6 text-center">
@@ -267,12 +262,12 @@ export default function ServicesPage() {
                 )}
               </div>
             </div>
-          </Card>
+          </div>
         ))}
       </div>
 
       {/* Service Coverage Area */}
-      <Card>
+      <div className="border rounded-lg">
         <div className="p-6">
           <h3 className="text-xl font-semibold mb-4">📍 Área de Cobertura</h3>
           <div className="grid md:grid-cols-2 gap-4">
@@ -298,10 +293,10 @@ export default function ServicesPage() {
             </div>
           </div>
         </div>
-      </Card>
+      </div>
 
       {/* Additional Services */}
-      <Card className="mt-6">
+      <div className="mt-6 border rounded-lg">
         <div className="p-6">
           <h3 className="text-xl font-semibold mb-4">🛠️ Serviços Adicionais</h3>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -327,7 +322,7 @@ export default function ServicesPage() {
             </div>
           </div>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }
